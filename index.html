@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>GVG &amp; ARTEFAL — Máquinas e Ferramentas</title>
+  <meta name="description" content="Controle de máquinas, ferramentas, entregas, devoluções e manutenção da GVG &amp; ARTEFAL.">
+  <meta name="theme-color" content="#0B1F3A">
+  <meta name="color-scheme" content="light">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icons/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="./icons/icone-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" sizes="180x180" href="./icons/icone-180.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="GVG Máquinas">
+  <meta name="mobile-web-app-capable" content="yes">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div id="boot" class="boot-screen" role="status" aria-live="polite">
+    <div class="boot-mark" aria-hidden="true">GVG</div>
+    <div class="boot-title">Controle de Máquinas e Ferramentas</div>
+    <div class="boot-spinner" aria-hidden="true"></div>
+    <div class="boot-text">Carregando o painel…</div>
+  </div>
+
+  <section id="authView" class="auth hidden" aria-label="Acesso ao sistema">
+    <div class="auth-brand">
+      <div class="auth-brand-inner">
+        <div class="brand-lockup">
+          <div class="brand-mark brand-mark-lg" aria-hidden="true">GVG</div>
+          <div>
+            <div class="brand-name">GVG <span>&amp;</span> ARTEFAL</div>
+            <div class="brand-sub">Máquinas e Ferramentas</div>
+          </div>
+        </div>
+        <h1>Controle completo do seu ferramental.</h1>
+        <p>Disponibilidade, entregas, devoluções, acessórios e manutenção em um só lugar — com histórico preservado.</p>
+        <div class="auth-3d" aria-hidden="true">
+          <div class="auth-3d-card">
+            <div class="auth-3d-top"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+            <div class="auth-3d-row"><span class="auth-3d-pill gold"></span><span class="auth-3d-line"></span></div>
+            <div class="auth-3d-row"><span class="auth-3d-pill green"></span><span class="auth-3d-line short"></span></div>
+            <div class="auth-3d-grid">
+              <div class="auth-3d-box"></div><div class="auth-3d-box"></div><div class="auth-3d-box"></div>
+            </div>
+          </div>
+          <div class="auth-3d-drill">⌁</div>
+        </div>
+        <div class="auth-points">
+          <span>✓ Perfis de acesso</span>
+          <span>✓ Devoluções parciais</span>
+          <span>✓ Histórico completo</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="auth-panel">
+      <div class="auth-card">
+        <div id="loginBox">
+          <div class="auth-card-head">
+            <div class="auth-kicker">Acesso restrito</div>
+            <h2>Entrar no painel</h2>
+            <p>Use a conta cadastrada pelo administrador.</p>
+          </div>
+          <form id="loginForm" class="form-stack" autocomplete="on" novalidate>
+            <label class="field">
+              <span>E-mail</span>
+              <input id="loginEmail" name="email" type="email" inputmode="email" autocomplete="username" placeholder="seuemail@exemplo.com" required>
+            </label>
+            <label class="field">
+              <span>Senha</span>
+              <div class="input-with-action">
+                <input id="loginPassword" name="senha" type="password" autocomplete="current-password" placeholder="Sua senha" required>
+                <button type="button" class="icon-btn input-action" data-toggle-password="loginPassword" aria-label="Mostrar senha">◉</button>
+              </div>
+            </label>
+            <div id="loginMessage" class="form-message" role="status" aria-live="polite"></div>
+            <button id="loginSubmit" class="btn btn-primary btn-lg btn-block" type="submit">Entrar</button>
+          </form>
+          <div class="auth-links">
+            <button type="button" class="link-btn" id="showRecovery">Esqueci a senha do administrador</button>
+            <button type="button" class="link-btn" id="showHelpLogin">Como instalar no celular</button>
+          </div>
+        </div>
+
+        <div id="setupBox" class="hidden">
+          <div class="auth-card-head">
+            <div class="auth-kicker">Primeira configuração</div>
+            <h2>Criar o administrador</h2>
+            <p>Use o código de configuração inicial fornecido com o projeto. Esta tela desaparece após a criação.</p>
+          </div>
+          <form id="setupForm" class="form-stack" novalidate>
+            <label class="field">
+              <span>Código de configuração</span>
+              <input id="setupCode" name="codigo" type="text" autocomplete="one-time-code" placeholder="CFG-XXXX-XXXX" required>
+            </label>
+            <label class="field">
+              <span>Nome do administrador</span>
+              <input id="setupName" name="nome" type="text" autocomplete="name" placeholder="Nome completo" required>
+            </label>
+            <label class="field">
+              <span>E-mail de acesso</span>
+              <input id="setupEmail" name="email" type="email" inputmode="email" autocomplete="email" placeholder="seuemail@exemplo.com" required>
+            </label>
+            <div class="form-row">
+              <label class="field">
+                <span>Senha</span>
+                <input id="setupPassword" name="senha" type="password" autocomplete="new-password" placeholder="Mínimo 8 caracteres" required>
+              </label>
+              <label class="field">
+                <span>Confirmar senha</span>
+                <input id="setupPassword2" name="senha2" type="password" autocomplete="new-password" placeholder="Repita a senha" required>
+              </label>
+            </div>
+            <div id="setupMessage" class="form-message" role="status" aria-live="polite"></div>
+            <button id="setupSubmit" class="btn btn-primary btn-lg btn-block" type="submit">Criar administrador</button>
+          </form>
+          <div class="auth-note">A senha é gravada apenas como hash com sal. O código de configuração é invalidado após o uso.</div>
+        </div>
+
+        <div id="recoveryBox" class="hidden">
+          <div class="auth-card-head">
+            <div class="auth-kicker">Recuperação protegida</div>
+            <h2>Redefinir senha do administrador</h2>
+            <p>O código de recuperação é gerado no Apps Script pelo proprietário e vale por 30 minutos.</p>
+          </div>
+          <form id="recoveryForm" class="form-stack" novalidate>
+            <label class="field">
+              <span>Código de recuperação</span>
+              <input id="recoveryCode" name="codigo" type="text" autocomplete="one-time-code" placeholder="REC-XXXX-XXXX" required>
+            </label>
+            <label class="field">
+              <span>E-mail do administrador</span>
+              <input id="recoveryEmail" name="email" type="email" inputmode="email" autocomplete="email" placeholder="seuemail@exemplo.com" required>
+            </label>
+            <div class="form-row">
+              <label class="field">
+                <span>Nova senha</span>
+                <input id="recoveryPassword" name="senha" type="password" autocomplete="new-password" placeholder="Mínimo 8 caracteres" required>
+              </label>
+              <label class="field">
+                <span>Confirmar senha</span>
+                <input id="recoveryPassword2" name="senha2" type="password" autocomplete="new-password" placeholder="Repita a senha" required>
+              </label>
+            </div>
+            <div id="recoveryMessage" class="form-message" role="status" aria-live="polite"></div>
+            <button id="recoverySubmit" class="btn btn-primary btn-lg btn-block" type="submit">Redefinir senha</button>
+            <button type="button" class="btn btn-ghost btn-block" id="backToLogin">Voltar para o login</button>
+          </form>
+        </div>
+
+        <div id="setupPendingBox" class="hidden">
+          <div class="auth-card-head">
+            <div class="auth-kicker">Configuração pendente</div>
+            <h2>Primeiro acesso ainda não habilitado</h2>
+            <p>Não há administrador e o código de configuração inicial não está ativo. Solicite a geração de um novo código no Apps Script.</p>
+          </div>
+          <button type="button" class="btn btn-primary btn-block" id="retrySetupStatus">Verificar novamente</button>
+        </div>
+      </div>
+      <div class="auth-foot">GVG &amp; ARTEFAL · Controle de Máquinas e Ferramentas · Acesso protegido</div>
+    </div>
+  </section>
+
+  <div id="appView" class="app hidden">
+    <aside id="sidebar" class="sidebar" aria-label="Menu principal">
+      <div class="sidebar-head">
+        <div class="brand-lockup brand-lockup-sm">
+          <div class="brand-mark" aria-hidden="true">GVG</div>
+          <div>
+            <div class="brand-name">GVG <span>&amp;</span> ARTEFAL</div>
+            <div class="brand-sub">Máquinas e Ferramentas</div>
+          </div>
+        </div>
+        <button type="button" class="icon-btn sidebar-close" id="sidebarClose" aria-label="Fechar menu">✕</button>
+      </div>
+
+      <nav class="nav" id="mainNav">
+        <button type="button" class="nav-item" data-view="dashboard"><span class="nav-ico" data-icon="dashboard"></span><span>Visão geral</span></button>
+        <button type="button" class="nav-item" data-view="equipamentos"><span class="nav-ico" data-icon="drill"></span><span>Equipamentos</span><span class="nav-badge" id="navEqBadge"></span></button>
+        <button type="button" class="nav-item" data-view="movimentacoes"><span class="nav-ico" data-icon="swap"></span><span>Movimentações</span></button>
+        <button type="button" class="nav-item" data-view="manutencoes"><span class="nav-ico" data-icon="wrench"></span><span>Manutenções</span><span class="nav-badge danger" id="navManBadge"></span></button>
+        <button type="button" class="nav-item" data-view="colaboradores"><span class="nav-ico" data-icon="users"></span><span>Colaboradores</span></button>
+        <button type="button" class="nav-item" data-view="categorias"><span class="nav-ico" data-icon="tag"></span><span>Categorias</span></button>
+        <div class="nav-sep admin-only" id="adminNavSep"></div>
+        <button type="button" class="nav-item admin-only" data-view="usuarios"><span class="nav-ico" data-icon="shield"></span><span>Usuários</span></button>
+        <button type="button" class="nav-item admin-only" data-view="auditoria"><span class="nav-ico" data-icon="history"></span><span>Auditoria</span></button>
+      </nav>
+
+      <div class="sidebar-foot">
+        <button type="button" class="sidebar-action" id="installAppBtn" hidden><span data-icon="download"></span> Instalar aplicativo</button>
+        <button type="button" class="sidebar-action" id="helpBtn"><span data-icon="help"></span> Ajuda e instalação</button>
+        <div class="sidebar-user">
+          <div class="avatar" id="userAvatar">A</div>
+          <div class="sidebar-user-info">
+            <strong id="userName">—</strong>
+            <span id="userRole">—</span>
+          </div>
+          <button type="button" class="icon-btn" id="userMenuBtn" aria-label="Menu da conta">⋯</button>
+        </div>
+        <div id="userMenu" class="user-menu hidden">
+          <button type="button" id="changePasswordBtn">Alterar minha senha</button>
+          <button type="button" id="logoutBtn" class="danger-text">Sair do sistema</button>
+        </div>
+      </div>
+    </aside>
+    <div id="sidebarBackdrop" class="sidebar-backdrop hidden"></div>
+
+    <div class="app-main">
+      <header class="topbar">
+        <div class="topbar-left">
+          <button type="button" class="icon-btn menu-btn" id="menuBtn" aria-label="Abrir menu">☰</button>
+          <div>
+            <h1 id="pageTitle">Visão geral</h1>
+            <p id="pageSubtitle">Resumo do controle de máquinas e ferramentas</p>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <label class="global-search" for="globalSearch">
+            <span data-icon="search"></span>
+            <input id="globalSearch" type="search" placeholder="Buscar equipamento, código…" autocomplete="off" aria-label="Busca global">
+            <kbd>/</kbd>
+          </label>
+          <button type="button" class="icon-btn" id="refreshBtn" title="Atualizar dados" aria-label="Atualizar dados"><span data-icon="refresh"></span></button>
+          <button type="button" class="topbar-user" id="topbarUser" aria-label="Conta">
+            <span class="avatar avatar-sm" id="topbarAvatar">A</span>
+            <span class="topbar-user-name" id="topbarName">—</span>
+          </button>
+        </div>
+      </header>
+      <main id="main" class="main" tabindex="-1"></main>
+    </div>
+  </div>
+
+  <div id="modalRoot"></div>
+  <div id="toastRoot" class="toast-root" aria-live="polite" aria-atomic="false"></div>
+  <div id="updateBanner" class="update-banner hidden" role="status">
+    <span>Nova versão disponível.</span>
+    <button type="button" class="btn btn-sm btn-primary" id="reloadAppBtn">Recarregar</button>
+  </div>
+  <div id="offlineBanner" class="offline-banner hidden" role="status">Sem conexão com a internet. Os dados serão atualizados quando a conexão voltar.</div>
+
+  <script src="./config.js"></script>
+  <script src="./app.js" defer></script>
+</body>
+</html>
