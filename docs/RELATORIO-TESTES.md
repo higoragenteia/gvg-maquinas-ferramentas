@@ -122,7 +122,20 @@ Teste estendido de botões e formulários, em uma segunda execução do frontend
 
 Todos os passos produziram o toast de sucesso esperado e nenhum erro de console/página foi registrado.
 
-## 6. CORS e comunicação
+## 6. Publicação no GitHub Pages
+
+No endereço público `https://higoragenteia.github.io/gvg-maquinas-ferramentas/`:
+
+- A tela de setup de produção apareceu corretamente.
+- `config.js` carregou a URL real do Apps Script.
+- `manifest.webmanifest` respondeu 200 com nome, escopo, `start_url` e ícones.
+- Todos os ícones (192, 512, 512 maskable, 180 e favicon) responderam 200.
+- O service worker registrou e ficou ativo no escopo do subdiretório.
+- Nenhum erro de console ou de página no desktop e no viewport móvel.
+
+O fluxo autenticado completo foi testado contra o mesmo backend a partir de uma origem local; a produção está sem administrador de propósito, então não foi criada uma sessão de produção.
+
+## 7. CORS e comunicação
 
 Teste real a partir de uma página em `http://127.0.0.1`:
 
@@ -137,7 +150,7 @@ O Web App foi publicado com:
 
 Foi necessária uma autorização única do proprietário no Apps Script. Sem ela, o Google retorna “Acesso negado”/“Authorization needed”. Depois da autorização e da correção do manifesto, a leitura anônima funcionou.
 
-## 7. Permissões
+## 8. Permissões
 
 - O backend exige sessão em todas as ações de dados.
 - O perfil `COLABORADOR` é bloqueado no servidor para ações de escrita.
@@ -147,7 +160,7 @@ Foi necessária uma autorização única do proprietário no Apps Script. Sem el
 
 O teste de escrita bloqueada para colaborador foi executado no ambiente automatizado do backend. Na produção não foi criada uma conta de teste para não inserir dados fictícios.
 
-## 8. Bugs encontrados e corrigidos durante os testes
+## 9. Bugs encontrados e corrigidos durante os testes
 
 - Linha de append calculada pelo número de colunas em vez da última linha da planilha.
 - Clique dentro do modal fechava o modal antes do envio do formulário.
@@ -160,7 +173,7 @@ O teste de escrita bloqueada para colaborador foi executado no ambiente automati
 
 Todos foram corrigidos e os testes finais passaram.
 
-## 9. O que não foi testado
+## 10. O que não foi testado
 
 - Instalação e abertura reais em Android e iPhone físicos.
 - Criação do administrador **de produção** (deliberadamente não feita; a produção está limpa).
@@ -171,6 +184,6 @@ Todos foram corrigidos e os testes finais passaram.
 - Recuperação de senha por e-mail (não usada; a recuperação é por código no editor).
 - Volume muito alto de registros (o projeto foi paginado, mas o volume atual é pequeno).
 
-## 10. Conclusão
+## 11. Conclusão
 
 O que foi implementado e testado está funcional no ambiente real de teste. A produção foi estruturada com os dados importados e está pronta para o primeiro administrador, sem dados de teste. As pendências reais são a criação do administrador de produção pelo proprietário e a confirmação de instalação nos aparelhos físicos Android/iPhone.
