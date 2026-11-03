@@ -100,7 +100,27 @@ Testes de viewport móvel (iPhone 13 em emulação):
 - Lista de equipamentos em cartões.
 - Ficha do equipamento.
 
-Nenhum erro de console foi registrado nos testes finais da interface.
+Teste estendido de botões e formulários, em uma segunda execução do frontend contra o backend simulado:
+
+- Criar categoria.
+- Criar dois colaboradores.
+- Criar equipamento com carregador e bateria.
+- Entregar.
+- Transferir para outro colaborador.
+- Devolver.
+- Enviar para manutenção.
+- Editar manutenção para “Em andamento”.
+- Concluir manutenção.
+- Editar equipamento.
+- Inativar e reativar equipamento.
+- Criar e excluir equipamento sem histórico.
+- Criar e excluir colaborador sem histórico.
+- Criar e excluir categoria sem histórico.
+- Criar usuário, editar nome, redefinir senha, bloquear e desbloquear.
+- Ocultar a lista de usuários.
+- Consultar a auditoria (25 registros após o teste).
+
+Todos os passos produziram o toast de sucesso esperado e nenhum erro de console/página foi registrado.
 
 ## 6. CORS e comunicação
 
@@ -136,6 +156,7 @@ O teste de escrita bloqueada para colaborador foi executado no ambiente automati
 - Botão “Transferir” da ficha tinha o mesmo problema.
 - Botão “Concluir” no dashboard não encontrava a manutenção fora da tela de manutenções.
 - Chamada idempotente repetida era validada antes de consultar o cache de idempotência.
+- Formulário de conclusão de manutenção iniciava o estado de retorno em “Novo” em vez de partir da conservação atual do equipamento.
 
 Todos foram corrigidos e os testes finais passaram.
 

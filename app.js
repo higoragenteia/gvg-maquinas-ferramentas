@@ -1770,6 +1770,8 @@ function openMaintenanceConclude(id) {
   if (!isAdmin()) return;
   const man = findMaintenance(id);
   if (!man) return;
+  const eqMan = (state.data.equipamentos || []).find((e) => e.id === man.equipamentoId);
+  const estadoAtual = man.estadoRetorno || (eqMan && eqMan.estadoConservacao) || 'NAO_INFORMADO';
   openModal({
     title: 'Concluir manutenção',
     subtitle: 'O equipamento voltará a ficar disponível. Registre o serviço e o estado de retorno.',
@@ -1777,7 +1779,7 @@ function openMaintenanceConclude(id) {
     body: `<form id="maintenanceConcludeForm" class="form-stack" novalidate>
       <div class="form-row">
         <label class="field"><span>Data de retorno <b class="required"></b></span><input name="dataRetorno" type="date" value="${todayIso()}" required></label>
-        <label class="field"><span>Estado de conservação no retorno</span><select name="estadoRetorno">${Object.keys(CONSERVACAO_LABEL).map((k) => `<option value="${k}" ${man.estadoRetorno === k ? 'selected' : ''}>${esc(CONSERVACAO_LABEL[k])}</option>`).join('')}</select></label>
+        <label class="field"><span>Estado de conservação no retorno</span><select name="estadoRetorno">${Object.keys(CONSERVACAO_LABEL).map((k) => `<option value="${k}" ${estadoAtual === k ? 'selected' : ''}>${esc(CONSERVACAO_LABEL[k])}</option>`).join('')}</select></label>
       </div>
       <label class="field"><span>Serviço realizado</span><textarea name="servico" placeholder="O que foi feito">${esc(man.servico || '')}</textarea></label>
       <div class="form-row">
