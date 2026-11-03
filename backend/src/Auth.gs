@@ -24,9 +24,10 @@ function verificarSenha(senha, salt, armazenado) {
   return iguaisSeguro(h, alvo);
 }
 
-function validarSenha(senha) {
+function validarSenha(senha, minimo) {
   const s = String(senha || '');
-  assert(s.length >= 8, 'SENHA_CURTA', 'A senha deve ter pelo menos 8 caracteres.');
+  const min = Number(minimo) || SENHA_MIN_ADMIN;
+  assert(s.length >= min, 'SENHA_CURTA', 'A senha deve ter pelo menos ' + min + ' caracteres.');
   assert(s.length <= 128, 'SENHA_LONGA', 'A senha deve ter no máximo 128 caracteres.');
   assert(!/^\s+$/.test(s), 'SENHA_INVALIDA', 'A senha não pode ser só espaços.');
   return s;
@@ -36,6 +37,17 @@ function validarEmail(email) {
   const e = normalizarEmail(email);
   assert(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e), 'EMAIL_INVALIDO', 'Informe um e-mail válido.');
   return e;
+}
+
+function validarLogin(login) {
+  const s = normalizarEmail(login);
+  assert(s.length >= 3 && s.length <= 80, 'LOGIN_INVALIDO', 'O usuário deve ter entre 3 e 80 caracteres.');
+  if (s.indexOf('@') >= 0) {
+    assert(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s), 'LOGIN_INVALIDO', 'Informe um e-mail válido ou um usuário sem espaços.');
+    return s;
+  }
+  assert(/^[a-z0-9._-]+$/.test(s), 'LOGIN_INVALIDO', 'Use letras, números, ponto, hífen ou sublinhado no usuário.');
+  return s;
 }
 
 function codigoHash(codigo) {
@@ -152,7 +164,7 @@ function login(payload, requestId) {
   payload = payload || {};
   const email = normalizarEmail(payload.email);
   const senha = String(payload.senha || '');
-  assert(email && senha, 'CREDENCIAIS_OBRIGATORIAS', 'Informe e-mail e senha.');
+  assert(email && senha, 'CREDENCIAIS_OBRIGATORIAS', 'Informe usuário/e-mail e senha.');
   const chave = 'login_fail_' + sha256Hex(email).slice(0, 24);
   const falhas = Number(cacheGet(chave) || 0);
   if (falhas >= MAX_TENTATIVAS_LOGIN) {
@@ -166,7 +178,10 @@ function login(payload, requestId) {
   if (!u || !verificarSenha(senha, u.SENHA_SALT, u.SENHA_HASH)) {
     cachePut(chave, String(falhas + 1), BLOQUEIO_LOGIN_SEGUNDOS);
     audit(null, 'LOGIN_FALHA', 'USUARIO', u ? u.ID : email, { email: email }, requestId, 'APP');
-    fail('CREDENCIAIS_INVALIDAS', 'E-mail ou senha inválidos.');
+    fail('CREDENCIAIS_INVALIDAS', 'Usuário/e-mail ou senha inválidos.');
+  }
+  if (String(u.STATUS) === 'PENDENTE') {
+    fail('CADASTRO_PENDENTE', 'Cadastro aguardando aprovação do administrador.');
   }
   if (String(u.STATUS) !== 'ATIVO') {
     fail('CONTA_BLOQUEADA', 'Sua conta está bloqueada. Fale com o administrador.');
@@ -192,7 +207,7 @@ function setupAdmin(payload, requestId) {
     fail('MUITAS_TENTATIVAS', 'Muitas tentativas de configuração. Aguarde 15 minutos.');
   }
   const nome = limparTexto(payload.nome, 120);
-  const email = validarEmail(payload.email);
+  const email = validarLogin(payload.email);
   const senha = validarSenha(payload.senha);
   const codigo = String(payload.codigo || '').trim().toUpperCase();
   assert(nome.length >= 2, 'NOME_INVALIDO', 'Informe o nome do administrador.');
@@ -211,7 +226,7 @@ function setupAdmin(payload, requestId) {
     }
     const usuarios = lerTodosUsuarios();
     for (let i = 0; i < usuarios.length; i++) {
-      if (normalizarEmail(usuarios[i].EMAIL) === email) fail('EMAIL_EM_USO', 'Já existe uma conta com esse e-mail.');
+      if (normalizarEmail(usuarios[i].EMAIL) === email) fail('EMAIL_EM_USO', 'Já existe uma conta com esse usuário/e-mail.');
     }
     const salt = Utilities.getUuid() + Utilities.getUuid();
     const agora = nowStamp();
@@ -239,7 +254,17 @@ function setupAdmin(payload, requestId) {
     cacheRemove('setup_fail');
     const sess = criarSessao(u, payload.userAgent, requestId);
     audit({ id: u.ID, email: u.EMAIL, perfil: u.PERFIL }, 'SETUP_ADMIN', 'USUARIO', u.ID, { email: email }, requestId);
-    return { token: sess.token, expiraEm: sess.expiraEm, usuario: usuarioPublico(u) };
+    const avisos = [];
+    try {
+      const sync = sincronizarTudoInterno({ id: u.ID, email: u.EMAIL, perfil: u.PERFIL }, requestId);
+      if (sync.erros && sync.erros.length) {
+        avisos.push('Administrador criado, mas ' + sync.erros.length + ' equipamento(s) não puderam ser sincronizados com as abas originais. Use Sincronizar planilha.');
+      }
+    } catch (e) {
+      console.error('Falha na sincronização inicial: ' + e);
+      avisos.push('Administrador criado, mas a sincronização inicial das abas originais falhou. Use Sincronizar planilha.');
+    }
+    return { token: sess.token, expiraEm: sess.expiraEm, usuario: usuarioPublico(u), avisos: avisos };
   });
 }
 
@@ -270,7 +295,7 @@ function recuperarAdmin(payload, requestId) {
       if (normalizarEmail(usuarios[i].EMAIL) === email) { u = usuarios[i]; break; }
     }
     if (!u || String(u.PERFIL) !== PERFIL.ADMIN || String(u.STATUS) !== 'ATIVO') {
-      fail('ADMIN_NAO_ENCONTRADO', 'Não há administrador ativo com esse e-mail.');
+      fail('ADMIN_NAO_ENCONTRADO', 'Não há administrador ativo com esse usuário/e-mail.');
     }
     const salt = Utilities.getUuid() + Utilities.getUuid();
     u.SENHA_HASH = hashSenha(senha, salt);
@@ -318,7 +343,7 @@ function criarUsuario(payload, session, requestId) {
   requireRequestId(requestId);
   payload = payload || {};
   const nome = limparTexto(payload.nome, 120);
-  const email = validarEmail(payload.email);
+  const email = validarLogin(payload.email);
   const senha = validarSenha(payload.senha);
   const perfil = String(payload.perfil || PERFIL.COLAB).toUpperCase();
   assert(perfil === PERFIL.ADMIN || perfil === PERFIL.COLAB, 'PERFIL_INVALIDO', 'Perfil inválido.');
@@ -327,7 +352,7 @@ function criarUsuario(payload, session, requestId) {
     return withLock(function () {
       const usuarios = lerTodosUsuarios();
       for (let i = 0; i < usuarios.length; i++) {
-        if (normalizarEmail(usuarios[i].EMAIL) === email) fail('EMAIL_EM_USO', 'Já existe uma conta com esse e-mail.');
+        if (normalizarEmail(usuarios[i].EMAIL) === email) fail('EMAIL_EM_USO', 'Já existe uma conta com esse usuário/e-mail.');
       }
       const salt = Utilities.getUuid() + Utilities.getUuid();
       const agora = nowStamp();
@@ -363,12 +388,12 @@ function editarUsuario(payload, session, requestId) {
       const usuarios = lerTodosUsuarios();
       const u = exigirRegistro(porId(usuarios, id), 'USUARIO_NAO_ENCONTRADO', 'Usuário não encontrado.');
       const nome = limparTexto(payload.nome === undefined ? u.NOME : payload.nome, 120);
-      const email = validarEmail(payload.email === undefined ? u.EMAIL : payload.email);
+      const email = validarLogin(payload.email === undefined ? u.EMAIL : payload.email);
       const perfil = String(payload.perfil === undefined ? u.PERFIL : payload.perfil).toUpperCase();
       assert(nome.length >= 2, 'NOME_INVALIDO', 'Informe o nome do usuário.');
       assert(perfil === PERFIL.ADMIN || perfil === PERFIL.COLAB, 'PERFIL_INVALIDO', 'Perfil inválido.');
       for (let i = 0; i < usuarios.length; i++) {
-        if (usuarios[i].ID !== u.ID && normalizarEmail(usuarios[i].EMAIL) === email) fail('EMAIL_EM_USO', 'Já existe uma conta com esse e-mail.');
+        if (usuarios[i].ID !== u.ID && normalizarEmail(usuarios[i].EMAIL) === email) fail('EMAIL_EM_USO', 'Já existe uma conta com esse usuário/e-mail.');
       }
       if (String(u.PERFIL) === PERFIL.ADMIN && perfil !== PERFIL.ADMIN) {
         assert(contarAdminsAtivos() > 1, 'ULTIMO_ADMIN', 'Não é possível remover o perfil do último administrador ativo.');
@@ -449,6 +474,77 @@ function desbloquearUsuario(payload, session, requestId) {
       u.ATUALIZADO_EM = nowStamp();
       updateObject(SHEET.USUARIOS, u._row, u);
       audit(session, 'DESBLOQUEAR_USUARIO', 'USUARIO', u.ID, { email: u.EMAIL }, requestId);
+      return { usuario: usuarioPublico(u) };
+    });
+  });
+}
+
+function autoCadastro(payload, requestId) {
+  payload = payload || {};
+  const login = validarLogin(payload.usuario || payload.login || payload.email);
+  const senha = validarSenha(payload.senha, SENHA_MIN_AUTO);
+  const nome = limparTexto(payload.nome, 120) || login;
+  const hora = Utilities.formatDate(new Date(), TZ, 'yyyyMMddHH');
+  const rateKey = 'auto_reg_' + hora;
+  const qtd = Number(cacheGet(rateKey) || 0);
+  if (qtd >= AUTO_CADASTRO_POR_HORA) {
+    fail('MUITOS_CADASTROS', 'Muitos cadastros nesta hora. Tente novamente mais tarde.');
+  }
+  return withLock(function () {
+    const usuarios = lerTodosUsuarios();
+    for (let i = 0; i < usuarios.length; i++) {
+      if (normalizarEmail(usuarios[i].EMAIL) === login) {
+        if (String(usuarios[i].STATUS) === 'PENDENTE') {
+          fail('CADASTRO_PENDENTE', 'Já existe um cadastro com esse usuário aguardando aprovação do administrador.');
+        }
+        fail('LOGIN_EM_USO', 'Já existe uma conta com esse usuário/e-mail.');
+      }
+    }
+    const salt = Utilities.getUuid() + Utilities.getUuid();
+    const agora = nowStamp();
+    const u = {
+      ID: newId('USR'),
+      NOME: nome,
+      EMAIL: login,
+      SENHA_HASH: hashSenha(senha, salt),
+      SENHA_SALT: salt,
+      PERFIL: PERFIL.COLAB,
+      STATUS: 'PENDENTE',
+      CRIADO_EM: agora,
+      ATUALIZADO_EM: agora,
+      ULTIMO_ACESSO: '',
+      CRIADO_POR: 'AUTO_CADASTRO',
+      OBSERVACOES: 'Cadastro enviado pelo próprio usuário. Aguardando aprovação do administrador. Não possui cadastro de colaborador automaticamente.'
+    };
+    appendObject(SHEET.USUARIOS, u);
+    cachePut(rateKey, String(qtd + 1), 3600);
+    audit(null, 'AUTO_CADASTRO', 'USUARIO', u.ID, { login: login }, requestId, 'APP');
+    return {
+      mensagem: 'Cadastro enviado. Aguarde a aprovação do administrador.',
+      status: 'PENDENTE',
+      login: login
+    };
+  });
+}
+
+function aprovarUsuario(payload, session, requestId) {
+  exigirAdmin(session);
+  requireRequestId(requestId);
+  const id = String((payload || {}).id || '').trim();
+  assert(id, 'USUARIO_OBRIGATORIO', 'Informe o usuário.');
+  return withIdempotencia(requestId, function () {
+    return withLock(function () {
+      const usuarios = lerTodosUsuarios();
+      const u = exigirRegistro(porId(usuarios, id), 'USUARIO_NAO_ENCONTRADO', 'Usuário não encontrado.');
+      if (String(u.STATUS) === 'ATIVO') return { usuario: usuarioPublico(u) };
+      if (String(u.STATUS) !== 'PENDENTE') {
+        fail('USUARIO_BLOQUEADO', 'Este cadastro está bloqueado. Use Desbloquear para liberar o acesso.');
+      }
+      u.STATUS = 'ATIVO';
+      u.ATUALIZADO_EM = nowStamp();
+      u.OBSERVACOES = normalizarTexto((u.OBSERVACOES ? u.OBSERVACOES + ' | ' : '') + 'Aprovado por ' + session.email + ' em ' + nowStamp());
+      updateObject(SHEET.USUARIOS, u._row, u);
+      audit(session, 'APROVAR_USUARIO', 'USUARIO', u.ID, { login: u.EMAIL }, requestId);
       return { usuario: usuarioPublico(u) };
     });
   });

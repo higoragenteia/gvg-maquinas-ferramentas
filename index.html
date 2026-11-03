@@ -57,17 +57,20 @@
     </div>
 
     <div class="auth-panel">
+      <button type="button" class="auth-install" id="authInstallBtn" aria-label="Instalar aplicativo">
+        <span data-icon="download"></span><span>Instalar app</span>
+      </button>
       <div class="auth-card">
         <div id="loginBox">
           <div class="auth-card-head">
             <div class="auth-kicker">Acesso restrito</div>
             <h2>Entrar no painel</h2>
-            <p>Use a conta cadastrada pelo administrador.</p>
+            <p>Entre com seu usuário e senha.</p>
           </div>
           <form id="loginForm" class="form-stack" autocomplete="on" novalidate>
             <label class="field">
-              <span>E-mail</span>
-              <input id="loginEmail" name="email" type="email" inputmode="email" autocomplete="username" placeholder="seuemail@exemplo.com" required>
+              <span>Usuário ou e-mail</span>
+              <input id="loginEmail" name="email" type="text" inputmode="text" autocomplete="username" placeholder="seu usuário ou e-mail" required>
             </label>
             <label class="field">
               <span>Senha</span>
@@ -81,7 +84,29 @@
           </form>
           <div class="auth-links">
             <button type="button" class="link-btn" id="showRecovery">Esqueci a senha do administrador</button>
-            <button type="button" class="link-btn" id="showHelpLogin">Como instalar no celular</button>
+          </div>
+          <div class="auth-divider"><span>Primeiro acesso?</span></div>
+          <div class="auth-signup">
+            <div class="auth-signup-head">
+              <strong>Cadastre-se</strong>
+              <span>O acesso é liberado pelo administrador.</span>
+            </div>
+            <form id="signupForm" class="form-stack" novalidate>
+              <label class="field">
+                <span>Usuário</span>
+                <input id="signupUser" name="usuario" type="text" autocomplete="username" placeholder="Escolha um usuário" required>
+              </label>
+              <label class="field">
+                <span>Senha</span>
+                <div class="input-with-action">
+                  <input id="signupPassword" name="senha" type="password" autocomplete="new-password" placeholder="Mínimo 5 caracteres" required>
+                  <button type="button" class="icon-btn input-action" data-toggle-password="signupPassword" aria-label="Mostrar senha">◉</button>
+                </div>
+              </label>
+              <div id="signupMessage" class="form-message" role="status" aria-live="polite"></div>
+              <button id="signupSubmit" class="btn btn-secondary btn-block" type="submit">Criar cadastro</button>
+            </form>
+            <div class="auth-note">A senha pode ser simples (inclusive 12345), mas o cadastro só entra no sistema após aprovação do administrador.</div>
           </div>
         </div>
 
@@ -132,8 +157,8 @@
               <input id="recoveryCode" name="codigo" type="text" autocomplete="one-time-code" placeholder="REC-XXXX-XXXX" required>
             </label>
             <label class="field">
-              <span>E-mail do administrador</span>
-              <input id="recoveryEmail" name="email" type="email" inputmode="email" autocomplete="email" placeholder="seuemail@exemplo.com" required>
+              <span>Usuário ou e-mail do administrador</span>
+              <input id="recoveryEmail" name="email" type="text" inputmode="text" autocomplete="username" placeholder="usuário ou e-mail" required>
             </label>
             <div class="form-row">
               <label class="field">
@@ -185,7 +210,7 @@
         <button type="button" class="nav-item" data-view="colaboradores"><span class="nav-ico" data-icon="users"></span><span>Colaboradores</span></button>
         <button type="button" class="nav-item" data-view="categorias"><span class="nav-ico" data-icon="tag"></span><span>Categorias</span></button>
         <div class="nav-sep admin-only" id="adminNavSep"></div>
-        <button type="button" class="nav-item admin-only" data-view="usuarios"><span class="nav-ico" data-icon="shield"></span><span>Usuários</span></button>
+        <button type="button" class="nav-item admin-only" data-view="usuarios"><span class="nav-ico" data-icon="shield"></span><span>Usuários</span><span class="nav-badge gold" id="navUsersBadge"></span></button>
         <button type="button" class="nav-item admin-only" data-view="auditoria"><span class="nav-ico" data-icon="history"></span><span>Auditoria</span></button>
       </nav>
 

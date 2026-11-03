@@ -10,6 +10,7 @@ Código do servidor que lê e grava na planilha privada e expõe a API para o Gi
 | `Planilha.gs` | Leitura/escrita, locks, cache, idempotência, auditoria, hash e utilitários. |
 | `Auth.gs` | Senhas, sessões, setup do administrador, recuperação e CRUD de usuários. |
 | `Dominio.gs` | Equipamentos, colaboradores, categorias, empréstimos, devoluções, transferências e manutenção. |
+| `Sincronizacao.gs` | Espelhamento das abas originais, criação de novas abas de categoria e sincronização em lote. |
 | `Code.gs` | Roteador `doGet`/`doPost`, permissões e respostas JSON. |
 | `Diagnostico.gs` | Funções de diagnóstico e manutenção no editor. |
 | `appsscript.json` | Manifesto com Web App e escopo de planilha. |
@@ -36,6 +37,7 @@ Execute no editor do Apps Script (não são rotas públicas):
 - `gerarCodigoSetup()` — gera um código inicial quando ainda não há administrador.
 - `gerarCodigoRecuperacao()` — gera um código de 30 minutos para redefinir a senha de um administrador ativo.
 - `formatarAbasComoSistema()` — aplica formato texto nas abas do sistema.
+- `sincronizarPlanilhaEditor()` — sincroniza as abas originais sem abrir o app.
 - `limparSessoesAntigas()` — remove sessões expiradas há mais de 30 dias.
 
 ## Segurança
@@ -46,6 +48,10 @@ Execute no editor do Apps Script (não são rotas públicas):
 - Permissões conferidas no servidor.
 - Setup e recuperação com códigos de uso único/curta duração, guardados como hash.
 - `LockService` nas escritas e idempotência por `requestId`.
+- Auto cadastro público cria conta `PENDENTE`, perfil de consulta, sem sessão; o administrador aprova.
+- Entrega/transferência aceitam nome livre e criam colaborador automaticamente, sem conta de acesso.
+- Sincronização das abas originais e criação de nova aba/categoria.
+- `COLABORADORES.SETOR` e `MANUTENCOES.CELULAR_RESPONSAVEL` são campos de texto; registros antigos ficam vazios.
 - Planilha privada.
 
 ## CORS

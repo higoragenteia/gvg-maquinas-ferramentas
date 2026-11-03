@@ -3,8 +3,9 @@
 ## 1. Entrar
 
 1. Abra o endereço publicado.
-2. Informe e-mail e senha cadastrados pelo administrador.
-3. No primeiro acesso do sistema, o administrador usa a tela **Criar o administrador** com o código de configuração inicial.
+2. Informe usuário/e-mail e senha.
+3. Na tela de login também existe **Cadastre-se**. A pessoa informa usuário e senha; o cadastro fica **PENDENTE** até a aprovação do administrador.
+4. O administrador aprova ou recusa em **Usuários**. A senha do auto cadastro pode ser simples, inclusive `12345`; contas administrativas devem usar senha forte.
 
 O perfil **COLABORADOR** só consulta. Ele não vê os botões de alteração porque eles são ocultados, mas o bloqueio real é feito no servidor.
 
@@ -30,6 +31,7 @@ A distribuição por categoria usa três cores: verde = disponível, amarelo = e
 - **Devolver** aparece quando há empréstimo aberto ou acessório pendente.
 - **Inativar** esconde o item das operações sem apagar o histórico. Só é permitido sem empréstimo/manutenção aberta.
 - **Excluir** só é permitido quando não existe nenhum empréstimo, manutenção ou movimentação. Caso contrário, use **Inativar**.
+- **Sincronizar planilha** (no topo do painel) atualiza as abas originais com o estado atual: responsável, datas, conservação, acessórios e cor.
 
 ### Códigos e quantidades
 
@@ -40,7 +42,7 @@ A distribuição por categoria usa três cores: verde = disponível, amarelo = e
 ## 4. Entregar
 
 1. Abra **Equipamentos** e clique em **Entregar** (ou use **Nova entrega** no painel).
-2. Escolha o equipamento, o colaborador e a data.
+2. Escolha o equipamento, digite o responsável e a data. O nome pode ser novo; se não existir, será cadastrado automaticamente como colaborador, sem criar acesso ao sistema.
 3. Informe a quantidade disponível e a conservação.
 4. Selecione os acessórios que serão entregues. O sistema limita pela quantidade que não está pendente com outro colaborador.
 5. Confirme.
@@ -71,7 +73,7 @@ Se a ferramenta voltar mas o carregador/bateria ficar com o colaborador:
 ## 6. Transferir responsável
 
 1. Na ficha do equipamento, clique em **Transferir**.
-2. Escolha o empréstimo aberto, o novo colaborador e a data.
+2. Escolha o empréstimo aberto, digite o novo responsável e a data. O nome pode ser novo; ele será cadastrado automaticamente, sem criar acesso ao sistema.
 3. Confirme.
 
 O sistema encerra a responsabilidade anterior como **Transferido**, cria uma nova responsabilidade e registra uma movimentação de **Transferência**. O histórico anterior não é apagado.
@@ -84,14 +86,14 @@ O sistema encerra a responsabilidade anterior como **Transferido**, cria uma nov
 
 1. Abra **Manutenções** → **Nova manutenção**.
 2. Escolha um equipamento **totalmente disponível**, sem empréstimo ou acessório pendente.
-3. Informe data de envio, defeito/motivo, responsável/assistência, previsão e custo.
+3. Informe data de envio, defeito/motivo, responsável/assistência, **celular da assistência** (opcional), previsão e custo.
 4. Confirme.
 
 Enquanto a manutenção estiver aberta, o equipamento fica **indisponível para entrega**.
 
 ### Atualizar
 
-Use **Editar** para mudar situação (Aberta/Em andamento), responsável, serviço, previsão, custo e observações.
+Use **Editar** para mudar situação (Aberta/Em andamento), responsável, celular da assistência, serviço, previsão, custo e observações.
 
 ### Concluir
 
@@ -103,7 +105,7 @@ Use **Cancelar** com motivo e data. O equipamento é liberado e o registro fica 
 
 ## 8. Colaboradores
 
-- Cadastre pessoa, grupo ou local.
+- Cadastre pessoa, grupo ou local, com tipo, função, contato, local/obra, setor e observações.
 - O cadastro de colaborador **não cria conta de acesso**.
 - Ao inativar, o colaborador deixa de aparecer em novas entregas. Só é permitido sem pendências.
 - **Excluir** só é permitido sem histórico; caso contrário, use **Inativar**.
@@ -112,6 +114,7 @@ Use **Cancelar** com motivo e data. O equipamento é liberado e o registro fica 
 ## 9. Categorias
 
 - Cada categoria tem nome, prefixo, ordem e rótulo do item.
+- **Nova categoria/aba** cria uma nova aba na planilha com o layout das abas originais e já deixa a categoria disponível em **Novo equipamento**.
 - O prefixo é usado na geração automática de códigos (ex.: `PAR-001`).
 - Não é possível trocar o prefixo de uma categoria que já possui equipamentos.
 - Categoria com equipamentos não pode ser excluída; use **Inativar**.
@@ -120,7 +123,9 @@ Use **Cancelar** com motivo e data. O equipamento é liberado e o registro fica 
 
 Somente o administrador vê esta área.
 
-- **Novo usuário**: nome, e-mail, perfil e senha inicial.
+- **Novo usuário**: nome, usuário/e-mail, perfil e senha inicial.
+- **Aprovar**: libera o acesso de um cadastro feito pela tela de login. O cadastro fica pendente até essa ação.
+- **Recusar**: bloqueia o cadastro pendente. Use **Desbloquear** depois, se necessário.
 - **Editar**: nome, e-mail e perfil. Alterar o perfil encerra as sessões abertas.
 - **Redefinir senha**: define uma nova senha e encerra as sessões antigas.
 - **Bloquear/Desbloquear**: bloqueia o login.
@@ -156,6 +161,8 @@ No iPhone, use o Safari; outros navegadores podem não instalar o PWA da mesma f
 
 - O aplicativo lê os dados ao abrir e ao tocar em **Atualizar**.
 - Alterações feitas diretamente nas abas do sistema aparecem ao recarregar.
+- As abas originais são espelhadas pelo aplicativo. Se você editá-las manualmente, a próxima sincronização pode sobrescrever o estado atual.
+- Use **Sincronizar planilha** para conferir e reparar as abas originais.
 - Não há promessa de atualização instantânea.
 - Se o aplicativo avisar **“Nova versão disponível”**, toque em **Recarregar**.
 

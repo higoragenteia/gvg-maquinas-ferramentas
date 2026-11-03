@@ -67,6 +67,32 @@ Das 50 importadas:
 - **25 movimentações** importadas: 22 entregas, 1 devolução e 2 saídas para manutenção.
 - **2 manutenções abertas**: `APL-003` e `MAR-001`.
 
+## 4.1 Sincronização das abas originais
+
+As abas originais não são apenas históricas: elas são espelhadas com o estado atual.
+
+| Campo na aba original | Origem no sistema |
+|---|---|
+| `Nº` | `ORIGEM_NUMERO` ou numeração da linha. |
+| `COLABORADOR` | `COLABORADOR_ATUAL_NOME`; vazio se disponível, `MANUTENÇÃO` se em manutenção. |
+| `ESTADO` | `ESTADO_CONSERVACAO` (NOVO, USADO, BOM, REGULAR, RUIM; vazio se não informado). |
+| Item (coluna D) | `CODIGO_MODELO` ou `MODELO`. |
+| `QT` | `QUANTIDADE_TOTAL`. |
+| `CARREGADOR` / `QT` | Código e quantidade do carregador; `0` quando não há. |
+| `BATERIA` / `QT` | Código e quantidade da bateria; `0` quando não há. |
+| `ENTREGA` | Última entrega (data atual, ou última data histórica se devolvido). |
+| `DEVOLUÇÃO` | Última devolução completa; vazio enquanto houver equipamento em posse. |
+| `ASSINATURA` | `OBSERVACOES`. |
+| Cor da coluna B | Amarelo entregue, verde disponível, vermelho manutenção, cinza inativo. |
+
+O histórico completo continua em `EMPRESTIMOS`, `MOVIMENTACOES` e `MANUTENCOES`. Em uma devolução completa, o nome atual sai da coluna B, a cor fica verde, a data de devolução vai para `DEVOLUÇÃO` e o nome antigo permanece no empréstimo e na movimentação. Em devolução parcial, o responsável permanece enquanto houver quantidade em posse.
+
+As datas são gravadas ao meio-dia no fuso do script para evitar deslocamento de um dia entre o fuso do Apps Script e o fuso da planilha.
+
+**Nova categoria/aba:** ao criar uma categoria pelo app, é criada uma aba com o mesmo layout (título mesclado, cabeçalho, 50 linhas numeradas). O primeiro equipamento da categoria ocupa a linha 4 e recebe o número 1. O código do equipamento (ex.: `BEU-001`) fica nas abas do sistema; a aba original usa a coluna D para o código/modelo, como nas abas antigas.
+
+**Novas colunas:** `COLABORADORES.SETOR` e `MANUTENCOES.CELULAR_RESPONSAVEL` (texto). Registros antigos ficaram vazios; nenhum telefone foi inventado.
+
 ## 5. Mapeamento das colunas
 
 | Origem | Destino no aplicativo |

@@ -34,11 +34,17 @@ O aplicativo usa as abas auxiliares:
 | `CONFIG` | Configurações, hash do setup e da recuperação (aba oculta). |
 | `LEIA-ME` | Instruções para o proprietário. |
 
-> **Importante:** depois da importação, o aplicativo lê as abas do sistema, não as abas originais. Editar uma aba original não altera o aplicativo. Edite pelo aplicativo ou pelas abas do sistema e recarregue a tela.
+> **Importante:** as abas do sistema continuam sendo a fonte de verdade. O aplicativo também sincroniza as abas originais com o estado atual: responsável, datas, conservação, acessórios, observações e cor. O histórico completo fica em `EMPRESTIMOS` e `MOVIMENTACOES`. Se uma aba original for editada manualmente, a próxima sincronização pode sobrescrever o estado atual. Use **Sincronizar planilha** ou `sincronizarPlanilhaEditor` para reparar.
+>
+> A aba `COLABORADORES` ganhou a coluna `SETOR`. A aba `MANUTENCOES` ganhou a coluna `CELULAR_RESPONSAVEL` (texto). A aba `USUARIOS` aceita o status `PENDENTE` para o auto cadastro.
 
 ## 3. Primeiro administrador (produção)
 
-A planilha de produção foi entregue **sem administrador** e **sem movimentações de teste**.
+**Estado atual:** a produção já possui um administrador configurado pelo proprietário. O código inicial foi invalidado.
+
+O procedimento abaixo vale para uma instalação nova ou uma planilha de teste sem administrador.
+
+A planilha de teste foi entregue **sem administrador** e **sem movimentações de teste**.
 
 1. Abra o aplicativo publicado.
 2. A tela **Criar o administrador** aparece quando ainda não existe administrador.
@@ -59,6 +65,28 @@ Se o código for perdido **antes** do primeiro administrador:
 3. Execute.
 4. O código aparece no log de execução.
 5. Use-o na tela de setup.
+
+O setup executa a sincronização inicial das abas originais. Em uma base com 50 equipamentos, a versão em lote leva cerca de 30 segundos; o frontend aguarda até 120 segundos antes de mostrar erro.
+
+### 3.1 Sincronização das abas originais
+
+O backend atualiza a aba original da categoria depois de cada operação autorizada:
+
+- coluna `COLABORADOR`: responsável atual; vazio quando devolvido; `MANUTENÇÃO` quando em manutenção;
+- coluna `ESTADO`: conservação atual;
+- colunas de código/modelo, quantidade, carregador e bateria;
+- `ENTREGA` e `DEVOLUÇÃO`: última entrega e última devolução;
+- `ASSINATURA`: observações;
+- cor da coluna B: amarelo entregue, verde disponível, vermelho manutenção, cinza inativo.
+
+O histórico completo fica nas abas `EMPRESTIMOS`, `MOVIMENTACOES` e `MANUTENCOES`. O nome do responsável anterior não é apagado do histórico; apenas sai do campo de posse atual.
+
+A primeira abertura do administrador após uma atualização executa a sincronização inicial (`SINCRONIZACAO_INICIAL=OK`). Também é possível executar:
+
+- botão **Sincronizar planilha** no painel;
+- função `sincronizarPlanilhaEditor()` no editor do Apps Script.
+
+**Nova categoria/aba:** o formulário **Nova categoria/aba** cria a aba na planilha, com o mesmo layout das abas originais, e já disponibiliza a categoria em **Novo equipamento**. Nomes duplicados, caracteres inválidos e abas existentes são bloqueados. A aba não é apagada automaticamente ao excluir a categoria; isso preserva os dados.
 
 ## 4. Recuperação do administrador
 
@@ -246,6 +274,9 @@ O importador foi usado uma única vez na produção. O resultado está documenta
 - O último administrador ativo não pode ser rebaixado/bloqueado.
 - Todas as operações de escrita chamam `exigirAdmin` e validam o perfil no servidor.
 - A API usa `LockService` e idempotência por `requestId` para reduzir duplicidade em reenvios.
+- A tela de login permite **auto cadastro** com usuário e senha. O cadastro nasce com status `PENDENTE`, perfil `COLABORADOR`, sem sessão e sem permissão; o administrador aprova em **Usuários**.
+- O auto cadastro aceita senha simples (inclusive `12345`), conforme solicitado. Contas administrativas e o setup inicial continuam exigindo pelo menos 8 caracteres.
+- A entrega/transferência aceita nome digitado livremente. O backend cria o colaborador automaticamente se o nome não existir, sem criar conta de acesso. Nomes iguais por caixa/espaços são reaproveitados; colaborador inativo bloqueia a operação.
 
 ### O que não fazer
 
@@ -278,6 +309,7 @@ Não exclua a planilha original nem o Excel de origem.
 - **Diária/semanal:** abra o app, confira pendências de devolução e manutenções abertas.
 - **Mensal:** execute `limparSessoesAntigas()` no editor.
 - **Mensal:** execute `testarEstrutura()` e confira se há avisos.
+- **Quando necessário:** use **Sincronizar planilha** ou `sincronizarPlanilhaEditor()` para reparar as abas originais.
 - **Antes de mudanças:** faça uma cópia da planilha e uma versão do Apps Script.
 - **Ao trocar o backend:** mantenha o mesmo deployment ID para não quebrar a URL do app.
 

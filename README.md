@@ -16,6 +16,11 @@ Aplicativo web (PWA) para controlar máquinas, ferramentas, colaboradores, entre
 - Entregas com validação de saldo, bloqueio de entrega duplicada e bloqueio de equipamento em manutenção.
 - Devoluções totais e parciais, com controle de acessórios pendentes.
 - Transferência de responsabilidade sem apagar o histórico.
+- Sincronização das abas originais com responsável atual, datas, conservação, acessórios e cores.
+- Entrega e transferência para nome digitado livremente, com criação automática do colaborador sem criar conta de acesso.
+- Criação de nova categoria/aba diretamente pelo aplicativo.
+- Auto cadastro na tela de login com aprovação do administrador.
+- Celular da assistência no cadastro/edição de manutenção.
 - Módulo de manutenção: envio, andamento, conclusão, cancelamento e custo.
 - Cadastro de colaboradores separado das contas de acesso.
 - Categorias com rótulo de item próprio.
@@ -27,12 +32,16 @@ Aplicativo web (PWA) para controlar máquinas, ferramentas, colaboradores, entre
 
 ## Acesso e primeiro administrador
 
-1. Abra o aplicativo publicado.
-2. Na primeira configuração, o proprietário informa o **código de configuração inicial** entregue em arquivo privado, define nome, e-mail e senha do administrador.
-3. O código é invalidado depois da criação. Ele **não** é armazenado neste repositório.
-4. Depois do setup, o administrador cria as contas dos demais usuários.
+A produção já possui administrador configurado pelo proprietário. O código de configuração inicial foi invalidado.
 
-> O aplicativo de produção foi publicado sem administrador criado. A criação do primeiro administrador é uma etapa do proprietário, com o código privado. Nenhum movimento fictício foi inserido na planilha de produção.
+Para novos usuários, o administrador pode:
+
+1. Criar a conta em **Usuários** → **Novo usuário**, ou
+2. Permitir que a pessoa use **Cadastre-se** na tela de login. O cadastro fica **PENDENTE** até o administrador aprovar em **Usuários**.
+
+O auto cadastro cria apenas uma conta de acesso com perfil de consulta. Ele não cria colaborador automaticamente e não concede permissão de administrador.
+
+> Em uma instalação nova, o primeiro administrador é criado com o código de configuração privado. O código não fica no repositório e é invalidado após o uso.
 
 ## Perfis
 
@@ -65,6 +74,18 @@ Google Sheets privada
 - `Content-Type: text/plain` evita o preflight CORS que o Apps Script não responde; `application/json` não funciona nesse endpoint.
 - A planilha permanece privada. O script executa como o proprietário e valida a sessão do aplicativo.
 
+## Sincronização com as abas originais
+
+As abas do sistema continuam sendo a fonte de verdade. Depois de cada operação autorizada, o backend também atualiza a aba original da categoria:
+
+- responsável atual (ou vazio quando devolvido);
+- data da última entrega e da última devolução;
+- conservação, código/modelo, quantidade e acessórios;
+- observações;
+- cor da coluna do colaborador: amarelo entregue, verde disponível, vermelho manutenção e cinza inativo.
+
+O histórico completo permanece em `EMPRESTIMOS` e `MOVIMENTACOES`. Editar uma aba original manualmente pode ser sobrescrito pela próxima sincronização. Use **Sincronizar planilha** no painel ou a função `sincronizarPlanilhaEditor` no Apps Script para reparar.
+
 ## Estrutura do repositório
 
 | Caminho | Conteúdo |
@@ -90,7 +111,7 @@ Google Sheets privada
 ## Limitações reais
 
 - O Apps Script não é um servidor dedicado: há cotas e latência do Google.
-- Não há atualização em tempo real. O aplicativo lê os dados ao abrir/atualizar; edições feitas diretamente nas abas do sistema aparecem ao recarregar.
+- Não há atualização em tempo real. O aplicativo lê os dados ao abrir/atualizar; edições feitas diretamente nas abas do sistema aparecem ao recarregar. As abas originais são espelhos e podem ser sobrescritas pela sincronização.
 - Não há envio de e-mail ou SMS. A recuperação do administrador é feita por código gerado no editor do Apps Script.
 - A assinatura antiga da planilha não é tratada como assinatura digital; o conteúdo foi preservado como observação.
 - Testes em Android/iPhone físicos dependem dos aparelhos do proprietário. O PWA foi preparado e testado em viewport móvel, mas a instalação real deve ser confirmada no aparelho.
@@ -106,6 +127,8 @@ Google Sheets privada
 
 - Interface publicada no GitHub Pages.
 - Backend publicado e integrado por CORS.
-- Planilha de produção estruturada, sem administrador e sem movimentações de teste.
+- Planilha de produção estruturada e com administrador configurado.
+- Sincronização das abas originais implementada e testada em cópia.
 - Testes de integração real feitos em uma cópia de teste, não na produção.
-- Primeiro administrador de produção: etapa do proprietário com o código privado.
+- O primeiro carregamento do administrador após a atualização executa a sincronização inicial das abas originais.
+- Instalação em aparelhos Android/iPhone físicos ainda depende de teste do proprietário.

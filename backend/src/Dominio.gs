@@ -196,6 +196,7 @@ function manutencaoView(m, ctx) {
     dataEnvio: m.DATA_ENVIO || '',
     defeito: m.DEFEITO || '',
     responsavel: m.RESPONSAVEL || '',
+    celularResponsavel: m.CELULAR_RESPONSAVEL || '',
     status: m.STATUS,
     servico: m.SERVICO || '',
     custo: m.CUSTO === '' || m.CUSTO === null || m.CUSTO === undefined ? '' : toNumber(m.CUSTO),
@@ -285,6 +286,7 @@ function colaboradorView(c, ctx) {
     telefone: c.TELEFONE || '',
     email: c.EMAIL || '',
     localObra: c.LOCAL_OBRA || '',
+    setor: c.SETOR || '',
     ativo: String(c.ATIVO) === 'SIM',
     observacoes: c.OBSERVACOES || '',
     origem: c.ORIGEM || '',
@@ -369,6 +371,23 @@ function dashboardData(session) {
     atualizadoEm: nowStamp()
   };
   if (session.perfil === PERFIL.ADMIN) {
+    try {
+      if (configGet('SINCRONIZACAO_INICIAL') !== 'OK') {
+        const lock = LockService.getScriptLock();
+        if (lock.tryLock(5000)) {
+          try {
+            const sync = sincronizarTudoInterno(session, 'BOOTSTRAP-SYNC-' + Date.now());
+            if (sync.erros && sync.erros.length) {
+              data.avisos.push({ tipo: 'SINCRONIZACAO', titulo: 'Sincronização inicial', texto: sync.erros.length + ' item(ns) não puderam ser sincronizados com as abas originais. Use Sincronizar planilha.' });
+            }
+          } finally {
+            try { lock.releaseLock(); } catch (e2) {}
+          }
+        }
+      }
+    } catch (e) {
+      data.avisos.push({ tipo: 'SINCRONIZACAO', titulo: 'Sincronização inicial', texto: 'A sincronização automática falhou: ' + e.message + ' Use Sincronizar planilha.' });
+    }
     data.usuarios = lerTodosUsuarios().map(usuarioPublico).sort(function (a, b) { return String(a.nome).localeCompare(String(b.nome), 'pt-BR'); });
   }
   return data;
@@ -536,9 +555,12 @@ function criarEquipamento(payload, session, requestId) {
         ATUALIZADO_POR: session.email
       };
       appendObject(SHEET.EQUIPAMENTOS, eq);
+      const eq2 = porId(lerTodosEquipamentos(), eq.ID);
+      const sync = sincronizarEquipamentoSeguro(eq2, { session: session, requestId: requestId });
+      const avisos = sync.ok ? [] : ['Equipamento salvo no sistema, mas a aba ' + (sync.aba || 'da categoria') + ' não foi sincronizada: ' + sync.erro + ' Use Sincronizar planilha.'];
       audit(session, 'CRIAR_EQUIPAMENTO', 'EQUIPAMENTO', eq.ID, { codigo: eq.CODIGO, categoria: cat.NOME, total: total }, requestId);
       const ctx = contexto();
-      return { equipamento: equipamentoView(porId(ctx.eqs, eq.ID), ctx) };
+      return { equipamento: equipamentoView(porId(ctx.eqs, eq.ID), ctx), avisos: avisos };
     });
   });
 }
@@ -554,6 +576,9 @@ function editarEquipamento(payload, session, requestId) {
       const ctx = contexto();
       const eq = exigirRegistro(porId(ctx.eqs, id), 'EQUIPAMENTO_NAO_ENCONTRADO', 'Equipamento não encontrado.');
       const catAnterior = ctx.catMap[eq.CATEGORIA_ID] || null;
+      const categoriaMudou = payload.categoriaId !== undefined && String(payload.categoriaId) !== String(eq.CATEGORIA_ID);
+      const abaAntiga = String(eq.ORIGEM_ABA || '');
+      const linhaAntiga = toInt(eq.ORIGEM_LINHA);
       let cat = catAnterior;
       if (payload.categoriaId !== undefined && String(payload.categoriaId) !== String(eq.CATEGORIA_ID)) {
         cat = categoriaAtiva(payload.categoriaId);
@@ -606,10 +631,19 @@ function editarEquipamento(payload, session, requestId) {
       }
       eq.ATUALIZADO_EM = nowStamp();
       eq.ATUALIZADO_POR = session.email;
+      if (categoriaMudou) {
+        eq.ORIGEM_ABA = '';
+        eq.ORIGEM_LINHA = '';
+        eq.ORIGEM_NUMERO = '';
+      }
       if (status !== STATUS_EQ.INATIVO && status !== STATUS_EQ.MANUTENCAO) {
         atualizarDerivados(eq, ctx.loans, ctx.mans);
       }
       updateObject(SHEET.EQUIPAMENTOS, eq._row, eq);
+      let avisoLimpeza = '';
+      if (categoriaMudou) {
+        try { limparLinhaAba(abaAntiga, linhaAntiga); } catch (e) { avisoLimpeza = 'A linha antiga da aba ' + abaAntiga + ' não pôde ser limpa: ' + e.message; }
+      }
       if (String(antes.codigo) !== String(eq.CODIGO) || String(antes.categoria) !== String(eq.CATEGORIA_ID)) {
         const eqNome = nomeEquipamento(eq, cat);
         ctx.loans.forEach(function (l) {
@@ -621,8 +655,13 @@ function editarEquipamento(payload, session, requestId) {
         });
       }
       audit(session, 'EDITAR_EQUIPAMENTO', 'EQUIPAMENTO', eq.ID, { antes: antes, depois: { codigo: eq.CODIGO, total: total, categoria: eq.CATEGORIA_ID, conservacao: eq.ESTADO_CONSERVACAO } }, requestId);
+      const eqAtual = porId(lerTodosEquipamentos(), eq.ID);
+      const sync = sincronizarEquipamentoSeguro(eqAtual, { session: session, requestId: requestId });
+      const avisos = [];
+      if (avisoLimpeza) avisos.push(avisoLimpeza);
+      if (!sync.ok) avisos.push('Equipamento salvo no sistema, mas a aba ' + (sync.aba || 'da categoria') + ' não foi sincronizada: ' + sync.erro + ' Use Sincronizar planilha.');
       const ctx2 = contexto();
-      return { equipamento: equipamentoView(porId(ctx2.eqs, eq.ID), ctx2) };
+      return { equipamento: equipamentoView(porId(ctx2.eqs, eq.ID), ctx2), avisos: avisos };
     });
   });
 }
@@ -667,9 +706,11 @@ function inativarEquipamento(payload, session, requestId) {
       eq.ATUALIZADO_POR = session.email;
       if (motivo) eq.OBSERVACOES = normalizarTexto((eq.OBSERVACOES ? eq.OBSERVACOES + ' | ' : '') + 'Inativado: ' + motivo);
       updateObject(SHEET.EQUIPAMENTOS, eq._row, eq);
+      const sync = sincronizarEquipamentoSeguro(eq, { session: session, requestId: requestId });
+      const avisos = sync.ok ? [] : ['Inativação salva no sistema, mas a aba ' + (sync.aba || 'da categoria') + ' não foi sincronizada: ' + sync.erro + ' Use Sincronizar planilha.'];
       audit(session, 'INATIVAR_EQUIPAMENTO', 'EQUIPAMENTO', eq.ID, { motivo: motivo }, requestId);
       const ctx2 = contexto();
-      return { equipamento: equipamentoView(porId(ctx2.eqs, eq.ID), ctx2) };
+      return { equipamento: equipamentoView(porId(ctx2.eqs, eq.ID), ctx2), avisos: avisos };
     });
   });
 }
@@ -689,9 +730,11 @@ function reativarEquipamento(payload, session, requestId) {
       eq.ATUALIZADO_EM = nowStamp();
       eq.ATUALIZADO_POR = session.email;
       updateObject(SHEET.EQUIPAMENTOS, eq._row, eq);
+      const sync = sincronizarEquipamentoSeguro(eq, { session: session, requestId: requestId });
+      const avisos = sync.ok ? [] : ['Reativação salva no sistema, mas a aba ' + (sync.aba || 'da categoria') + ' não foi sincronizada: ' + sync.erro + ' Use Sincronizar planilha.'];
       audit(session, 'REATIVAR_EQUIPAMENTO', 'EQUIPAMENTO', eq.ID, null, requestId);
       const ctx2 = contexto();
-      return { equipamento: equipamentoView(porId(ctx2.eqs, eq.ID), ctx2) };
+      return { equipamento: equipamentoView(porId(ctx2.eqs, eq.ID), ctx2), avisos: avisos };
     });
   });
 }
@@ -710,9 +753,11 @@ function excluirEquipamento(payload, session, requestId) {
       if (loans.length || mans.length || movs.length) {
         fail('EQUIPAMENTO_COM_HISTORICO', 'Este equipamento possui histórico. Use a inativação para preservar os registros.');
       }
+      const avisos = [];
+      try { limparLinhaAba(eq.ORIGEM_ABA, eq.ORIGEM_LINHA); } catch (e) { avisos.push('Equipamento excluído, mas a linha da aba ' + eq.ORIGEM_ABA + ' não pôde ser limpa: ' + e.message); }
       deleteObject(SHEET.EQUIPAMENTOS, eq._row);
       audit(session, 'EXCLUIR_EQUIPAMENTO', 'EQUIPAMENTO', eq.ID, { codigo: eq.CODIGO }, requestId);
-      return { ok: true };
+      return { ok: true, avisos: avisos };
     });
   });
 }
@@ -736,6 +781,7 @@ function criarColaborador(payload, session, requestId) {
         TELEFONE: limparTexto(payload.telefone, 40),
         EMAIL: limparTexto(payload.email, 160),
         LOCAL_OBRA: limparTexto(payload.localObra, 160),
+        SETOR: limparTexto(payload.setor, 120),
         ATIVO: 'SIM',
         OBSERVACOES: limparTexto(payload.observacoes, 1000),
         ORIGEM: 'APP', CRIADO_EM: agora, ATUALIZADO_EM: agora
@@ -768,15 +814,18 @@ function editarColaborador(payload, session, requestId) {
       c.TELEFONE = payload.telefone === undefined ? c.TELEFONE : limparTexto(payload.telefone, 40);
       c.EMAIL = payload.email === undefined ? c.EMAIL : limparTexto(payload.email, 160);
       c.LOCAL_OBRA = payload.localObra === undefined ? c.LOCAL_OBRA : limparTexto(payload.localObra, 160);
+      c.SETOR = payload.setor === undefined ? c.SETOR : limparTexto(payload.setor, 120);
       c.OBSERVACOES = payload.observacoes === undefined ? c.OBSERVACOES : limparTexto(payload.observacoes, 1000);
       c.ATUALIZADO_EM = nowStamp();
       updateObject(SHEET.COLABORADORES, c._row, c);
+      const afetados = {};
       if (normalizarKey(antes) !== normalizarKey(nome)) {
         ctx.eqs.forEach(function (e) {
           if (String(e.COLABORADOR_ATUAL_ID) === String(c.ID)) {
             e.COLABORADOR_ATUAL_NOME = nome;
             e.ATUALIZADO_EM = nowStamp();
             updateObject(SHEET.EQUIPAMENTOS, e._row, e);
+            afetados[e.ID] = true;
           }
         });
         ctx.loans.forEach(function (l) {
@@ -784,12 +833,20 @@ function editarColaborador(payload, session, requestId) {
             l.COLABORADOR_NOME = nome;
             l.ATUALIZADO_EM = nowStamp();
             updateObject(SHEET.EMPRESTIMOS, l._row, l);
+            afetados[l.EQUIPAMENTO_ID] = true;
           }
         });
       }
       audit(session, 'EDITAR_COLABORADOR', 'COLABORADOR', c.ID, { antes: antes, depois: nome }, requestId);
       const ctx2 = contexto();
-      return { colaborador: colaboradorView(porId(ctx2.cols, c.ID), ctx2) };
+      const avisos = [];
+      Object.keys(afetados).forEach(function (eqId) {
+        const eq = porId(ctx2.eqs, eqId);
+        if (!eq) return;
+        const s = sincronizarEquipamentoSeguro(eq, { session: session, requestId: requestId });
+        if (!s.ok) avisos.push('Aba de ' + eq.CODIGO + ' não sincronizada: ' + s.erro);
+      });
+      return { colaborador: colaboradorView(porId(ctx2.cols, c.ID), ctx2), avisos: avisos };
     });
   });
 }
@@ -865,15 +922,23 @@ function criarCategoria(payload, session, requestId) {
         if (String(c.PREFIXO || '').toUpperCase() === prefixo) fail('PREFIXO_EM_USO', 'Já existe uma categoria com esse prefixo.');
       });
       const agora = nowStamp();
+      const campoItem = limparTexto(payload.campoItem, 60) || 'ITEM';
+      const aba = criarAbaCategoria(nome, campoItem, null);
       const c = {
-        ID: newId('CAT'), NOME: nome, NOME_ABA: '', CAMPO_ITEM: limparTexto(payload.campoItem, 60) || 'ITEM',
+        ID: newId('CAT'), NOME: nome, NOME_ABA: aba.nome, CAMPO_ITEM: campoItem,
         PREFIXO: prefixo, ORDEM: toInt(payload.ordem) || (cats.length + 1), ATIVO: 'SIM',
-        OBSERVACAO_ORIGEM: '', OBSERVACAO_IMPORTACAO: '', CRIADO_EM: agora, ATUALIZADO_EM: agora
+        OBSERVACAO_ORIGEM: '', OBSERVACAO_IMPORTACAO: 'Aba "' + aba.nome + '" criada pelo aplicativo em ' + agora + '.',
+        CRIADO_EM: agora, ATUALIZADO_EM: agora
       };
-      appendObject(SHEET.CATEGORIAS, c);
-      audit(session, 'CRIAR_CATEGORIA', 'CATEGORIA', c.ID, { nome: nome, prefixo: prefixo }, requestId);
+      try {
+        appendObject(SHEET.CATEGORIAS, c);
+      } catch (e) {
+        try { getSpreadsheet().deleteSheet(aba.sheet); } catch (e2) {}
+        throw e;
+      }
+      audit(session, 'CRIAR_CATEGORIA', 'CATEGORIA', c.ID, { nome: nome, prefixo: prefixo, aba: aba.nome }, requestId);
       const ctx = contexto();
-      return { categoria: categoriaView(porId(ctx.cats, c.ID), ctx) };
+      return { categoria: categoriaView(porId(ctx.cats, c.ID), ctx), aba: aba.nome };
     });
   });
 }
@@ -906,6 +971,13 @@ function editarCategoria(payload, session, requestId) {
       c.ORDEM = payload.ordem === undefined ? toInt(c.ORDEM) : toInt(payload.ordem);
       c.ATUALIZADO_EM = nowStamp();
       updateObject(SHEET.CATEGORIAS, c._row, c);
+      try {
+        const shAba = getSpreadsheet().getSheetByName(c.NOME_ABA);
+        if (shAba) {
+          shAba.getRange(1, 1).setValue(nome);
+          shAba.getRange(3, 4).setValue(c.CAMPO_ITEM || 'ITEM');
+        }
+      } catch (e) {}
       if (normalizarKey(antes) !== normalizarKey(nome)) {
         ctx.eqs.forEach(function (e) {
           if (String(e.CATEGORIA_ID) === String(c.ID)) {
@@ -1060,6 +1132,42 @@ function atualizarDerivados(eq, loans, mans) {
   return eq;
 }
 
+function resolverColaboradorOperacao(payload, cfg) {
+  payload = payload || {};
+  cfg = cfg || {};
+  const nomeInformado = limparTexto(payload[cfg.campoNome], 120);
+  const id = String(payload[cfg.campoId] || '').trim();
+  const cols = lerTodosColaboradores();
+  const base = id ? porId(cols, id) : null;
+  const nome = nomeInformado || (base ? base.NOME : '');
+  assert(nome.length >= 2, 'COLABORADOR_OBRIGATORIO', 'Informe o responsável.');
+  const chave = normalizarKey(nome);
+  let existente = null;
+  if (base && normalizarKey(base.NOME) === chave) existente = base;
+  if (!existente) {
+    for (let i = 0; i < cols.length; i++) {
+      if (normalizarKey(cols[i].NOME) === chave) { existente = cols[i]; break; }
+    }
+  }
+  if (existente) {
+    if (String(existente.ATIVO) !== 'SIM') {
+      fail('COLABORADOR_INATIVO', 'O responsável "' + existente.NOME + '" está inativo. Reative o cadastro ou informe outro nome.');
+    }
+    return existente;
+  }
+  const agora = nowStamp();
+  const origem = String(cfg.origem || 'OPERACAO');
+  const novo = {
+    ID: newId('COL'), NOME: nome, TIPO: 'NAO_INFORMADO', FUNCAO: '', TELEFONE: '', EMAIL: '',
+    LOCAL_OBRA: '', SETOR: '', ATIVO: 'SIM',
+    OBSERVACOES: 'Criado automaticamente ao registrar ' + origem.toLowerCase() + '. Não possui acesso ao sistema.',
+    ORIGEM: 'AUTO_' + origem, CRIADO_EM: agora, ATUALIZADO_EM: agora
+  };
+  appendObject(SHEET.COLABORADORES, novo);
+  audit(cfg.session, 'CRIAR_COLABORADOR_AUTO', 'COLABORADOR', novo.ID, { nome: nome, origem: origem }, cfg.requestId);
+  return novo;
+}
+
 function registrarEntrega(payload, session, requestId) {
   exigirAdmin(session);
   requireRequestId(requestId);
@@ -1068,7 +1176,7 @@ function registrarEntrega(payload, session, requestId) {
     return withLock(function () {
       const ctx = contexto();
       const eq = exigirRegistro(porId(ctx.eqs, payload.equipamentoId), 'EQUIPAMENTO_NAO_ENCONTRADO', 'Equipamento não encontrado.');
-      const col = colaboradorAtivo(payload.colaboradorId);
+      const col = resolverColaboradorOperacao(payload, { campoNome: 'colaboradorNome', campoId: 'colaboradorId', origem: 'ENTREGA', session: session, requestId: requestId });
       if (String(eq.STATUS) === STATUS_EQ.INATIVO) fail('EQUIPAMENTO_INATIVO', 'Equipamento inativo não pode ser entregue.');
       if (String(eq.STATUS) === STATUS_EQ.MANUTENCAO) fail('EQUIPAMENTO_MANUTENCAO', 'Equipamento em manutenção não pode ser entregue.');
       const qtd = Math.max(1, toInt(payload.quantidade) || 1);
@@ -1104,9 +1212,11 @@ function registrarEntrega(payload, session, requestId) {
       atualizarDerivados(eq2, lerTodosEmprestimos(), lerTodasManutencoes());
       eq2.ATUALIZADO_EM = agora; eq2.ATUALIZADO_POR = session.email;
       updateObject(SHEET.EQUIPAMENTOS, eq2._row, eq2);
+      const sync = sincronizarEquipamentoSeguro(eq2, { session: session, requestId: requestId });
+      const avisos = sync.ok ? [] : ['Entrega salva no sistema, mas a aba ' + (sync.aba || 'da categoria') + ' não foi sincronizada: ' + sync.erro + ' Use Sincronizar planilha.'];
       audit(session, 'REGISTRAR_ENTREGA', 'EMPRESTIMO', loanId, { equipamento: eq.CODIGO, colaborador: col.NOME, quantidade: qtd, acessorios: acc }, requestId);
       const ctx2 = contexto();
-      return { equipamento: equipamentoView(porId(ctx2.eqs, eq.ID), ctx2), emprestimo: emprestimoView(porId(ctx2.loans, loanId), ctx2) };
+      return { equipamento: equipamentoView(porId(ctx2.eqs, eq.ID), ctx2), emprestimo: emprestimoView(porId(ctx2.loans, loanId), ctx2), avisos: avisos };
     });
   });
 }
@@ -1153,9 +1263,11 @@ function registrarDevolucao(payload, session, requestId) {
       eq.ATUALIZADO_EM = agora; eq.ATUALIZADO_POR = session.email;
       atualizarDerivados(eq, lerTodosEmprestimos(), lerTodasManutencoes());
       updateObject(SHEET.EQUIPAMENTOS, eq._row, eq);
+      const sync = sincronizarEquipamentoSeguro(eq, { session: session, requestId: requestId });
+      const avisos = sync.ok ? [] : ['Devolução salva no sistema, mas a aba ' + (sync.aba || 'da categoria') + ' não foi sincronizada: ' + sync.erro + ' Use Sincronizar planilha.'];
       audit(session, 'REGISTRAR_DEVOLUCAO', 'EMPRESTIMO', loan.ID, { equipamento: eq.CODIGO, quantidade: qtdDev, acessorios: acc.devolvidos, encerrado: encerrado }, requestId);
       const ctx2 = contexto();
-      return { equipamento: equipamentoView(porId(ctx2.eqs, eq.ID), ctx2), emprestimo: emprestimoView(porId(ctx2.loans, loan.ID), ctx2) };
+      return { equipamento: equipamentoView(porId(ctx2.eqs, eq.ID), ctx2), emprestimo: emprestimoView(porId(ctx2.loans, loan.ID), ctx2), avisos: avisos };
     });
   });
 }
@@ -1169,7 +1281,7 @@ function registrarTransferencia(payload, session, requestId) {
       const ctx = contexto();
       const loan = exigirRegistro(porId(ctx.loans, payload.emprestimoId), 'EMPRESTIMO_NAO_ENCONTRADO', 'Empréstimo não encontrado.');
       if (String(loan.STATUS) !== STATUS_LOAN.ABERTO || toInt(loan.QUANTIDADE) <= 0) fail('TRANSFERENCIA_INVALIDA', 'Só é possível transferir um empréstimo aberto com equipamento em posse do colaborador.');
-      const novo = colaboradorAtivo(payload.novoColaboradorId);
+      const novo = resolverColaboradorOperacao(payload, { campoNome: 'novoColaboradorNome', campoId: 'novoColaboradorId', origem: 'TRANSFERENCIA', session: session, requestId: requestId });
       if (String(novo.ID) === String(loan.COLABORADOR_ID)) fail('TRANSFERENCIA_INVALIDA', 'O novo responsável é o mesmo colaborador atual.');
       const data = validarData(payload.data, true, 'a data da transferência');
       const eq = exigirRegistro(porId(ctx.eqs, loan.EQUIPAMENTO_ID), 'EQUIPAMENTO_NAO_ENCONTRADO', 'Equipamento não encontrado.');
@@ -1207,9 +1319,11 @@ function registrarTransferencia(payload, session, requestId) {
       eq.ATUALIZADO_EM = agora; eq.ATUALIZADO_POR = session.email;
       atualizarDerivados(eq, lerTodosEmprestimos(), lerTodasManutencoes());
       updateObject(SHEET.EQUIPAMENTOS, eq._row, eq);
+      const sync = sincronizarEquipamentoSeguro(eq, { session: session, requestId: requestId });
+      const avisos = sync.ok ? [] : ['Transferência salva no sistema, mas a aba ' + (sync.aba || 'da categoria') + ' não foi sincronizada: ' + sync.erro + ' Use Sincronizar planilha.'];
       audit(session, 'TRANSFERIR', 'EMPRESTIMO', loan.ID, { equipamento: eq.CODIGO, de: oldColab.nome, para: novo.NOME, acessorios: transf }, requestId);
       const ctx2 = contexto();
-      return { equipamento: equipamentoView(porId(ctx2.eqs, eq.ID), ctx2), emprestimo: emprestimoView(porId(ctx2.loans, novoLoanId), ctx2) };
+      return { equipamento: equipamentoView(porId(ctx2.eqs, eq.ID), ctx2), emprestimo: emprestimoView(porId(ctx2.loans, novoLoanId), ctx2), avisos: avisos };
     });
   });
 }
@@ -1237,6 +1351,7 @@ function abrirManutencao(payload, session, requestId) {
         ID: manId, EQUIPAMENTO_ID: eq.ID, EQUIPAMENTO_CODIGO: eq.CODIGO,
         CATEGORIA_NOME: (ctx.catMap[eq.CATEGORIA_ID] || {}).NOME || eq.CATEGORIA_NOME,
         DATA_ENVIO: data, DEFEITO: limparTexto(payload.defeito, 1000), RESPONSAVEL: limparTexto(payload.responsavel, 200),
+        CELULAR_RESPONSAVEL: limparTexto(payload.celularResponsavel, 40),
         STATUS: STATUS_MAN.ABERTA, SERVICO: '', CUSTO: custo, PREVISAO_RETORNO: previsao, DATA_RETORNO: '', ESTADO_RETORNO: '',
         OBSERVACOES: limparTexto(payload.observacoes, 2000), ORIGEM: 'APP', USUARIO: session.email,
         CRIADO_EM: agora, ATUALIZADO_EM: agora, REVISAR: 'NAO', MOTIVO_REVISAO: ''
@@ -1250,6 +1365,8 @@ function abrirManutencao(payload, session, requestId) {
       eq.ACESSORIOS_PENDENTES = '[]';
       eq.ATUALIZADO_EM = agora; eq.ATUALIZADO_POR = session.email;
       updateObject(SHEET.EQUIPAMENTOS, eq._row, eq);
+      const sync = sincronizarEquipamentoSeguro(eq, { session: session, requestId: requestId });
+      const avisos = sync.ok ? [] : ['Manutenção salva no sistema, mas a aba ' + (sync.aba || 'da categoria') + ' não foi sincronizada: ' + sync.erro + ' Use Sincronizar planilha.'];
       appendObject(SHEET.MOVIMENTACOES, {
         ID: movId, DATA: data, TIPO: 'SAIDA_MANUTENCAO', EQUIPAMENTO_ID: eq.ID, EQUIPAMENTO_CODIGO: eq.CODIGO,
         CATEGORIA_NOME: man.CATEGORIA_NOME, QUANTIDADE: toNumber(eq.QUANTIDADE_TOTAL),
@@ -1260,7 +1377,7 @@ function abrirManutencao(payload, session, requestId) {
       });
       audit(session, 'ABRIR_MANUTENCAO', 'MANUTENCAO', manId, { equipamento: eq.CODIGO, defeito: man.DEFEITO }, requestId);
       const ctx2 = contexto();
-      return { equipamento: equipamentoView(porId(ctx2.eqs, eq.ID), ctx2), manutencao: manutencaoView(porId(ctx2.mans, manId), ctx2) };
+      return { equipamento: equipamentoView(porId(ctx2.eqs, eq.ID), ctx2), manutencao: manutencaoView(porId(ctx2.mans, manId), ctx2), avisos: avisos };
     });
   });
 }
@@ -1278,6 +1395,7 @@ function atualizarManutencao(payload, session, requestId) {
       man.STATUS = status;
       man.DEFEITO = payload.defeito === undefined ? man.DEFEITO : limparTexto(payload.defeito, 1000);
       man.RESPONSAVEL = payload.responsavel === undefined ? man.RESPONSAVEL : limparTexto(payload.responsavel, 200);
+      man.CELULAR_RESPONSAVEL = payload.celularResponsavel === undefined ? man.CELULAR_RESPONSAVEL : limparTexto(payload.celularResponsavel, 40);
       man.SERVICO = payload.servico === undefined ? man.SERVICO : limparTexto(payload.servico, 1000);
       man.CUSTO = payload.custo === undefined ? man.CUSTO : (payload.custo === '' ? '' : Math.max(0, toNumber(payload.custo)));
       man.PREVISAO_RETORNO = payload.previsaoRetorno === undefined ? man.PREVISAO_RETORNO : validarData(payload.previsaoRetorno, false, 'a previsão de retorno');
@@ -1305,6 +1423,7 @@ function concluirManutencao(payload, session, requestId) {
       const estado = payload.estadoRetorno === undefined || payload.estadoRetorno === '' ? (eq.ESTADO_CONSERVACAO || 'NAO_INFORMADO') : validarConservacao(payload.estadoRetorno, eq.ESTADO_CONSERVACAO);
       const agora = nowStamp();
       man.STATUS = STATUS_MAN.CONCLUIDA;
+      man.CELULAR_RESPONSAVEL = payload.celularResponsavel === undefined ? man.CELULAR_RESPONSAVEL : limparTexto(payload.celularResponsavel, 40);
       man.SERVICO = payload.servico === undefined ? man.SERVICO : limparTexto(payload.servico, 1000);
       man.CUSTO = payload.custo === undefined ? man.CUSTO : (payload.custo === '' ? '' : Math.max(0, toNumber(payload.custo)));
       man.DATA_RETORNO = data;
@@ -1317,6 +1436,8 @@ function concluirManutencao(payload, session, requestId) {
       eq.ESTADO_CONSERVACAO = estado;
       eq.ATUALIZADO_EM = agora; eq.ATUALIZADO_POR = session.email;
       updateObject(SHEET.EQUIPAMENTOS, eq._row, eq);
+      const sync = sincronizarEquipamentoSeguro(eq, { session: session, requestId: requestId });
+      const avisos = sync.ok ? [] : ['Manutenção concluída no sistema, mas a aba ' + (sync.aba || 'da categoria') + ' não foi sincronizada: ' + sync.erro + ' Use Sincronizar planilha.'];
       appendObject(SHEET.MOVIMENTACOES, {
         ID: newId('MOV'), DATA: data, TIPO: 'RETORNO_MANUTENCAO', EQUIPAMENTO_ID: eq.ID, EQUIPAMENTO_CODIGO: eq.CODIGO,
         CATEGORIA_NOME: man.CATEGORIA_NOME, QUANTIDADE: toNumber(eq.QUANTIDADE_TOTAL),
@@ -1327,7 +1448,7 @@ function concluirManutencao(payload, session, requestId) {
       });
       audit(session, 'CONCLUIR_MANUTENCAO', 'MANUTENCAO', man.ID, { equipamento: eq.CODIGO, data: data, estado: estado }, requestId);
       const ctx2 = contexto();
-      return { equipamento: equipamentoView(porId(ctx2.eqs, eq.ID), ctx2), manutencao: manutencaoView(porId(ctx2.mans, man.ID), ctx2) };
+      return { equipamento: equipamentoView(porId(ctx2.eqs, eq.ID), ctx2), manutencao: manutencaoView(porId(ctx2.mans, man.ID), ctx2), avisos: avisos };
     });
   });
 }
@@ -1354,6 +1475,8 @@ function cancelarManutencao(payload, session, requestId) {
       eq.QUANTIDADE_DISPONIVEL = toNumber(eq.QUANTIDADE_TOTAL);
       eq.ATUALIZADO_EM = agora; eq.ATUALIZADO_POR = session.email;
       updateObject(SHEET.EQUIPAMENTOS, eq._row, eq);
+      const sync = sincronizarEquipamentoSeguro(eq, { session: session, requestId: requestId });
+      const avisos = sync.ok ? [] : ['Cancelamento salvo no sistema, mas a aba ' + (sync.aba || 'da categoria') + ' não foi sincronizada: ' + sync.erro + ' Use Sincronizar planilha.'];
       appendObject(SHEET.MOVIMENTACOES, {
         ID: newId('MOV'), DATA: data, TIPO: 'AJUSTE', EQUIPAMENTO_ID: eq.ID, EQUIPAMENTO_CODIGO: eq.CODIGO,
         CATEGORIA_NOME: man.CATEGORIA_NOME, QUANTIDADE: toNumber(eq.QUANTIDADE_TOTAL),
@@ -1364,7 +1487,7 @@ function cancelarManutencao(payload, session, requestId) {
       });
       audit(session, 'CANCELAR_MANUTENCAO', 'MANUTENCAO', man.ID, { equipamento: eq.CODIGO, motivo: motivo }, requestId);
       const ctx2 = contexto();
-      return { equipamento: equipamentoView(porId(ctx2.eqs, eq.ID), ctx2), manutencao: manutencaoView(porId(ctx2.mans, man.ID), ctx2) };
+      return { equipamento: equipamentoView(porId(ctx2.eqs, eq.ID), ctx2), manutencao: manutencaoView(porId(ctx2.mans, man.ID), ctx2), avisos: avisos };
     });
   });
 }

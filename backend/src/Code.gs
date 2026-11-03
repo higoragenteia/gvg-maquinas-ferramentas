@@ -16,6 +16,9 @@ const PUBLIC_ACTIONS = {
   login: function (payload, requestId) {
     return login(payload, requestId);
   },
+  autoCadastro: function (payload, requestId) {
+    return autoCadastro(payload, requestId);
+  },
   recuperarAdmin: function (payload, requestId) {
     return recuperarAdmin(payload, requestId);
   }
@@ -66,7 +69,9 @@ const ADMIN_WRITE = {
   editarUsuario: editarUsuario,
   resetarSenhaUsuario: resetarSenhaUsuario,
   bloquearUsuario: bloquearUsuario,
-  desbloquearUsuario: desbloquearUsuario
+  desbloquearUsuario: desbloquearUsuario,
+  aprovarUsuario: aprovarUsuario,
+  sincronizarTudo: sincronizarTudo
 };
 
 function doGet(e) {

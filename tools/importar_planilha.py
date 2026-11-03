@@ -33,11 +33,11 @@ CATS = [
 
 HEADERS = {
     'CATEGORIAS': ['ID','NOME','NOME_ABA','CAMPO_ITEM','PREFIXO','ORDEM','ATIVO','OBSERVACAO_ORIGEM','OBSERVACAO_IMPORTACAO','CRIADO_EM','ATUALIZADO_EM'],
-    'COLABORADORES': ['ID','NOME','TIPO','FUNCAO','TELEFONE','EMAIL','LOCAL_OBRA','ATIVO','OBSERVACOES','ORIGEM','CRIADO_EM','ATUALIZADO_EM'],
+    'COLABORADORES': ['ID','NOME','TIPO','FUNCAO','TELEFONE','EMAIL','LOCAL_OBRA','ATIVO','OBSERVACOES','ORIGEM','CRIADO_EM','ATUALIZADO_EM','SETOR'],
     'EQUIPAMENTOS': ['ID','CODIGO','CATEGORIA_ID','CATEGORIA_NOME','CODIGO_MODELO','DESCRICAO','MARCA','MODELO','NUMERO_SERIE','QUANTIDADE_TOTAL','QUANTIDADE_DISPONIVEL','ESTADO_CONSERVACAO','ESTADO_ORIGEM','STATUS','COLABORADOR_ATUAL_ID','COLABORADOR_ATUAL_NOME','CARREGADOR_CODIGO','CARREGADOR_QTD','BATERIA_CODIGO','BATERIA_QTD','DATA_ENTREGA_ATUAL','ACESSORIOS_PENDENTES','OBSERVACOES','ORIGEM_ABA','ORIGEM_LINHA','ORIGEM_NUMERO','REVISAR','MOTIVO_REVISAO','CRIADO_EM','ATUALIZADO_EM','CRIADO_POR','ATUALIZADO_POR'],
     'EMPRESTIMOS': ['ID','EQUIPAMENTO_ID','EQUIPAMENTO_CODIGO','EQUIPAMENTO_NOME','COLABORADOR_ID','COLABORADOR_NOME','DATA_ENTREGA','QUANTIDADE','ESTADO_ENTREGA','ACESSORIOS_ENTREGUES','ACESSORIOS_PENDENTES','EQUIPAMENTO_DEVOLVIDO','DATA_DEVOLUCAO_EQUIPAMENTO','STATUS','MOVIMENTO_ENTREGA_ID','MOVIMENTO_ENCERRAMENTO_ID','OBSERVACOES','ORIGEM','CRIADO_EM','ATUALIZADO_EM','USUARIO'],
     'MOVIMENTACOES': ['ID','DATA','TIPO','EQUIPAMENTO_ID','EQUIPAMENTO_CODIGO','CATEGORIA_NOME','QUANTIDADE','COLABORADOR_ORIGEM_ID','COLABORADOR_ORIGEM_NOME','COLABORADOR_DESTINO_ID','COLABORADOR_DESTINO_NOME','ESTADO_CONSERVACAO','ACESSORIOS_ENTREGUES','ACESSORIOS_DEVOLVIDOS','ACESSORIOS_PENDENTES','OBSERVACOES','EMPRESTIMO_ID','MANUTENCAO_ID','USUARIO_ID','USUARIO_EMAIL','ORIGEM','REQUEST_ID','CRIADO_EM'],
-    'MANUTENCOES': ['ID','EQUIPAMENTO_ID','EQUIPAMENTO_CODIGO','CATEGORIA_NOME','DATA_ENVIO','DEFEITO','RESPONSAVEL','STATUS','SERVICO','CUSTO','PREVISAO_RETORNO','DATA_RETORNO','ESTADO_RETORNO','OBSERVACOES','ORIGEM','USUARIO','CRIADO_EM','ATUALIZADO_EM','REVISAR','MOTIVO_REVISAO'],
+    'MANUTENCOES': ['ID','EQUIPAMENTO_ID','EQUIPAMENTO_CODIGO','CATEGORIA_NOME','DATA_ENVIO','DEFEITO','RESPONSAVEL','STATUS','SERVICO','CUSTO','PREVISAO_RETORNO','DATA_RETORNO','ESTADO_RETORNO','OBSERVACOES','ORIGEM','USUARIO','CRIADO_EM','ATUALIZADO_EM','REVISAR','MOTIVO_REVISAO','CELULAR_RESPONSAVEL'],
     'USUARIOS': ['ID','NOME','EMAIL','SENHA_HASH','SENHA_SALT','PERFIL','STATUS','CRIADO_EM','ATUALIZADO_EM','ULTIMO_ACESSO','CRIADO_POR','OBSERVACOES'],
     'SESSOES': ['TOKEN_HASH','USUARIO_ID','CRIADO_EM','EXPIRA_EM','REVOGADO_EM','USER_AGENT','ULTIMO_USO','REQUEST_ID'],
     'AUDITORIA': ['ID','DATA','USUARIO_ID','USUARIO_EMAIL','PERFIL','ACAO','ENTIDADE','ENTIDADE_ID','DETALHES','ORIGEM','REQUEST_ID'],
@@ -439,6 +439,8 @@ def main():
         {'CHAVE': 'SETUP_USADO_EM', 'VALOR': '', 'ATUALIZADO_EM': NOW},
         {'CHAVE': 'RESET_CODE_HASH', 'VALOR': '', 'ATUALIZADO_EM': NOW},
         {'CHAVE': 'RESET_EXPIRA_EM', 'VALOR': '', 'ATUALIZADO_EM': NOW},
+        {'CHAVE': 'SINCRONIZACAO_INICIAL', 'VALOR': '', 'ATUALIZADO_EM': NOW},
+        {'CHAVE': 'ULTIMA_SINCRONIZACAO', 'VALOR': '', 'ATUALIZADO_EM': NOW},
     ]
     leia = [
         ['GVG & ARTEFAL — Controle de Máquinas e Ferramentas'],
@@ -448,17 +450,18 @@ def main():
         [''],
         ['ABAS ORIGINAIS PRESERVADAS'],
         ['As 12 abas originais (PARAFUSADEIRA, APLICADOR DE SILICONE ELETRICO, MARTELETE, ESMERILHADEIRA, SERRA TICO TICO, FURADEIRA ELÉTRICA, SERRA CIRCULAR, SOPRADOR, REBITADEIRA, APLICADOR E ALINHADOR DE  FITA, POLICORTE e SERRA MARM 110MM) foram mantidas.'],
-        ['Elas são a referência histórica da importação. O aplicativo NÃO lê essas abas depois da importação; ele usa as abas do sistema abaixo.'],
-        ['Se você editar as abas originais, a alteração não aparecerá no aplicativo. Edite pelo aplicativo ou pelas abas do sistema.'],
+        ['O aplicativo usa as abas do sistema e sincroniza as abas originais com o responsável atual, datas, conservação, acessórios, observações e cor.'],
+        ['Se você editar uma aba original manualmente, a próxima sincronização pode sobrescrever o estado atual. Use Sincronizar planilha para reparar.'],
+        ['Novas categorias criadas pelo aplicativo geram uma nova aba com o mesmo layout.'],
         [''],
         ['ABAS DO SISTEMA'],
         ['CATEGORIAS: categorias e rótulos de item.'],
-        ['COLABORADORES: pessoas, grupos ou locais que recebem equipamentos. Não são contas de acesso.'],
+        ['COLABORADORES: pessoas, grupos ou locais que recebem equipamentos. Não são contas de acesso. Campo SETOR disponível.'],
         ['EQUIPAMENTOS: cadastro atual, disponibilidade, conservação, acessórios e pendências.'],
         ['EMPRESTIMOS: cada entrega e o que ainda está pendente.'],
         ['MOVIMENTACOES: histórico de entregas, devoluções, transferências e manutenção.'],
-        ['MANUTENCOES: registros de manutenção.'],
-        ['USUARIOS: contas de acesso (aba oculta; contém apenas hash de senha, nunca a senha).'],
+        ['MANUTENCOES: registros de manutenção. CELULAR_RESPONSAVEL guarda o celular da assistência como texto.'],
+        ['USUARIOS: contas de acesso (aba oculta; contém apenas hash de senha, nunca a senha). Status: ATIVO, PENDENTE, BLOQUEADO.'],
         ['SESSOES: sessões ativas (aba oculta).'],
         ['AUDITORIA: registro de ações administrativas (aba oculta).'],
         ['CONFIG: configurações do sistema e códigos de configuração/recuperação (aba oculta).'],
@@ -591,7 +594,7 @@ def main():
         if title == 'COLABORADORES': dv('ATIVO', ['SIM', 'NAO'])
         if title == 'USUARIOS':
             dv('PERFIL', ['ADMINISTRADOR', 'COLABORADOR'])
-            dv('STATUS', ['ATIVO', 'BLOQUEADO'])
+            dv('STATUS', ['ATIVO', 'BLOQUEADO', 'PENDENTE'])
         if title == 'MOVIMENTACOES': dv('TIPO', ['ENTREGA', 'DEVOLUCAO', 'TRANSFERENCIA', 'SAIDA_MANUTENCAO', 'RETORNO_MANUTENCAO', 'AJUSTE', 'IMPORTACAO'])
         if title == 'EMPRESTIMOS': dv('STATUS', ['ABERTO', 'ENCERRADO', 'TRANSFERIDO'])
         # condicional status

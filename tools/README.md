@@ -12,6 +12,8 @@ Script Python usado uma única vez para transformar as 12 abas originais nas aba
 - Marca casos ambíguos como `REVISAR` e grava o motivo.
 - Grava o hash do código de setup inicial no `CONFIG`.
 - Ajusta a exibição das datas das abas originais para `dd/mm/yyyy` sem alterar os valores.
+- Cria as colunas `COLABORADORES.SETOR` e `MANUTENCOES.CELULAR_RESPONSAVEL` vazias.
+- Cria as chaves `SINCRONIZACAO_INICIAL` e `ULTIMA_SINCRONIZACAO` no `CONFIG`.
 - Formata as colunas de código das abas originais como texto.
 
 ## Requisitos

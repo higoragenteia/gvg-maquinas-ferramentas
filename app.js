@@ -241,7 +241,7 @@ async function api(action, payload, opts) {
     payload: payload || {},
   };
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), opts.timeout || 45000);
+  const timer = setTimeout(() => controller.abort(), opts.timeout || 120000);
   let res;
   try {
     res = await fetch(API_URL, {
@@ -417,7 +417,7 @@ async function doLogin(e) {
   const email = $('loginEmail').value.trim();
   const senha = $('loginPassword').value;
   clearFormErrors(form);
-  if (!email || !senha) { setFormMessage($('loginMessage'), 'Informe e-mail e senha.', 'error'); return; }
+  if (!email || !senha) { setFormMessage($('loginMessage'), 'Informe usuário/e-mail e senha.', 'error'); return; }
   const rid = form.dataset.requestId || genId();
   form.dataset.requestId = rid;
   setButtonBusy(btn, true);
@@ -430,6 +430,31 @@ async function doLogin(e) {
     showToast(`Bem-vindo, ${firstName(data.usuario.nome)}.`, 'success');
   } catch (err) {
     setFormMessage($('loginMessage'), err.message, 'error');
+  } finally {
+    setButtonBusy(btn, false);
+  }
+}
+
+async function doSignup(e) {
+  e.preventDefault();
+  const form = $('signupForm');
+  const btn = $('signupSubmit');
+  const usuario = $('signupUser').value.trim();
+  const senha = $('signupPassword').value;
+  clearFormErrors(form);
+  if (!usuario || !senha) { setFormMessage($('signupMessage'), 'Informe usuário e senha.', 'error'); return; }
+  if (senha.length < 5) { setFormMessage($('signupMessage'), 'A senha deve ter pelo menos 5 caracteres.', 'error'); return; }
+  const rid = form.dataset.requestId || genId();
+  form.dataset.requestId = rid;
+  setButtonBusy(btn, true);
+  try {
+    const data = await api('autoCadastro', { usuario: usuario, senha: senha }, { token: '', requestId: rid });
+    form.dataset.requestId = '';
+    $('signupPassword').value = '';
+    setFormMessage($('signupMessage'), data.mensagem || 'Cadastro enviado. Aguarde a aprovação do administrador.', 'success');
+    showToast('Cadastro enviado. Aguarde a aprovação do administrador.', 'success');
+  } catch (err) {
+    setFormMessage($('signupMessage'), err.message, 'error');
   } finally {
     setButtonBusy(btn, false);
   }
@@ -458,6 +483,7 @@ async function doSetup(e) {
     const boot = await api('bootstrap', {});
     enterApp(boot);
     showToast('Administrador criado. A configuração inicial foi encerrada.', 'success');
+    if (data.avisos && data.avisos.length) setTimeout(() => showToast(data.avisos.join(' '), 'error'), 700);
   } catch (err) {
     setFormMessage($('setupMessage'), err.message, 'error');
   } finally {
@@ -505,6 +531,8 @@ function updateChrome() {
   $('topbarAvatar').textContent = initials(state.user.nome);
   $('navEqBadge').textContent = String(state.data.stats ? state.data.stats.totalEquipamentos : '') || '';
   $('navManBadge').textContent = String((state.data.manutencoesAbertas || []).length || '') || '';
+  const pendentes = (state.data.usuarios || []).filter((u) => u.status === 'PENDENTE').length;
+  $('navUsersBadge').textContent = pendentes ? String(pendentes) : '';
   const meta = VIEW_META[state.view] || VIEW_META.dashboard;
   $('pageTitle').textContent = meta.title;
   $('pageSubtitle').textContent = meta.subtitle;
@@ -598,11 +626,23 @@ function renderDashboard() {
         <p>${esc(dateStr)} · ${esc(d.config ? d.config.appNome : 'Controle de Máquinas e Ferramentas')}</p>
       </div>
       <div class="page-actions">
-        ${admin ? `<button type="button" class="btn btn-primary" data-action="new-delivery">${icon('plus')} Nova entrega</button>
-        <button type="button" class="btn btn-secondary" data-action="new-equipment">${icon('drill')} Novo equipamento</button>` : ''}
         <button type="button" class="btn btn-secondary" data-action="refresh">${icon('refresh')} Atualizar</button>
       </div>
     </div>
+
+    ${admin ? `<section class="card quick-actions">
+      <div class="quick-actions-head">
+        <div><h3>Ações rápidas</h3><p>Atalhos para as operações mais usadas no dia a dia.</p></div>
+        <button type="button" class="quick-sync" data-action="sync-sheet">Sincronizar planilha</button>
+      </div>
+      <div class="quick-actions-grid">
+        ${quickAction('new-delivery', 'Registrar entrega', 'Nova saída de equipamento', 'arrowUpRight', 'primary')}
+        ${quickAction('new-equipment', 'Cadastrar equipamento', 'Novo item no controle', 'plus')}
+        ${quickAction('new-maintenance', 'Enviar para manutenção', 'Indisponibiliza o item', 'wrench')}
+        ${quickAction('new-collaborator', 'Novo colaborador', 'Quem recebe equipamentos', 'userPlus')}
+        ${quickAction('new-category', 'Nova categoria/aba', 'Cria categoria e aba', 'tag')}
+      </div>
+    </section>` : ''}
 
     <div class="stat-grid">
       ${statCard('Disponíveis', s.disponiveis || 0, `de ${fmtQty(s.totalItens || 0)} itens ativos`, 'package', 'green', 'stat-go-equip')}
@@ -666,18 +706,6 @@ function renderDashboard() {
       </section>
     </div>
 
-    ${admin ? `<section class="card section-gap">
-      <div class="card-head"><div><h3 class="card-title">Ações rápidas</h3><p class="card-sub">Atalhos para as operações mais usadas.</p></div></div>
-      <div class="card-body">
-        <div class="flex flex-wrap" style="gap:8px">
-          <button type="button" class="btn btn-primary" data-action="new-delivery">${icon('arrowUpRight')} Registrar entrega</button>
-          <button type="button" class="btn btn-secondary" data-action="new-equipment">${icon('plus')} Cadastrar equipamento</button>
-          <button type="button" class="btn btn-secondary" data-action="new-maintenance">${icon('wrench')} Enviar para manutenção</button>
-          <button type="button" class="btn btn-secondary" data-action="new-collaborator">${icon('userPlus')} Novo colaborador</button>
-          <button type="button" class="btn btn-secondary" data-action="new-category">${icon('tag')} Nova categoria</button>
-        </div>
-      </div>
-    </section>` : ''}
   `;
   bindDashboardEvents();
 }
@@ -688,6 +716,13 @@ function statCard(label, value, meta, ico, tone, action) {
     <div class="stat-value">${fmtQty(value)}</div>
     <div class="stat-meta">${esc(meta)}</div>
   </article>`;
+}
+
+function quickAction(action, label, sub, ico, tone) {
+  return `<button type="button" class="quick-action ${tone || ''}" data-action="${esc(action)}">
+    <span class="quick-action-icon">${icon(ico)}</span>
+    <span class="quick-action-body"><strong>${esc(label)}</strong><small>${esc(sub)}</small></span>
+  </button>`;
 }
 
 function categoryRow(c) {
@@ -737,7 +772,7 @@ function manutencaoItem(m) {
     <span class="pending-icon">${icon('wrench')}</span>
     <div class="pending-body">
       <div class="pending-title">${esc(m.equipamentoCodigo)} — ${esc(m.equipamentoNome)}</div>
-      <div class="pending-sub">${esc(m.defeito || 'Sem defeito informado')} · ${esc(fmtDate(m.dataEnvio))}${m.responsavel ? ' · ' + esc(m.responsavel) : ''}</div>
+      <div class="pending-sub">${esc(m.defeito || 'Sem defeito informado')} · ${esc(fmtDate(m.dataEnvio))}${m.responsavel ? ' · ' + esc(m.responsavel) : ''}${m.celularResponsavel ? ' · ' + esc(m.celularResponsavel) : ''}</div>
     </div>
     <div class="pending-actions">
       ${isAdmin() ? `<button type="button" class="btn btn-sm btn-secondary" data-action="conclude-maintenance" data-id="${esc(m.id)}">Concluir</button>` : ''}
@@ -997,7 +1032,7 @@ function manCard(m) {
   return `<article class="entity-card">
     <div class="entity-head"><div><div class="entity-title">${esc(m.equipamentoCodigo)} — ${esc(m.equipamentoNome)}</div><div class="entity-sub">${esc(m.categoriaNome)} · envio ${esc(fmtDate(m.dataEnvio))}</div></div>${manPill(m.status)}</div>
     <div class="small"><strong>Defeito:</strong> ${esc(m.defeito || 'não informado')}</div>
-    <div class="small muted">Responsável: ${esc(m.responsavel || 'não informado')}${m.previsaoRetorno ? ' · previsão ' + esc(fmtDate(m.previsaoRetorno)) : ''}${m.dataRetorno ? ' · retorno ' + esc(fmtDate(m.dataRetorno)) : ''}</div>
+    <div class="small muted">Responsável: ${esc(m.responsavel || 'não informado')}${m.celularResponsavel ? ' · ' + esc(m.celularResponsavel) : ''}${m.previsaoRetorno ? ' · previsão ' + esc(fmtDate(m.previsaoRetorno)) : ''}${m.dataRetorno ? ' · retorno ' + esc(fmtDate(m.dataRetorno)) : ''}</div>
     <div class="entity-metrics"><div class="entity-metric"><strong>${fmtMoney(m.custo)}</strong>custo</div><div class="entity-metric"><strong>${esc(m.estadoRetorno || '—')}</strong>estado retorno</div></div>
     ${m.observacoes ? `<div class="entity-note">${esc(m.observacoes)}</div>` : ''}
     ${m.revisar ? `<div class="alert alert-warn small">${icon('alert')}<div>${esc(m.motivoRevisao || 'Revisar dados importados.')}</div></div>` : ''}
@@ -1027,7 +1062,7 @@ function colabCard(c) {
   return `<article class="entity-card" style="${c.ativo ? '' : 'opacity:.72;'}">
     <div class="entity-head"><div class="flex"><span class="avatar">${esc(initials(c.nome))}</span><div><div class="entity-title">${esc(c.nome)}</div><div class="entity-sub">${esc(TIPO_COLAB_LABEL[c.tipo] || c.tipo || 'Não informado')}${c.funcao ? ' · ' + esc(c.funcao) : ''}</div></div></div><span class="badge ${c.ativo ? 'green' : 'gray'}">${c.ativo ? 'Ativo' : 'Inativo'}</span></div>
     <div class="small muted">${c.email ? esc(c.email) : ''}${c.telefone ? (c.email ? ' · ' : '') + esc(c.telefone) : ''}${!c.email && !c.telefone ? 'Sem contato informado' : ''}</div>
-    ${c.localObra ? `<div class="small muted">${icon('mapPin')} ${esc(c.localObra)}</div>` : ''}
+    ${(c.localObra || c.setor) ? `<div class="small muted">${c.localObra ? `${icon('mapPin')} ${esc(c.localObra)}` : ''}${c.localObra && c.setor ? ' · ' : ''}${c.setor ? 'Setor: ' + esc(c.setor) : ''}</div>` : ''}
     <div class="entity-metrics"><div class="entity-metric"><strong>${fmtQty(c.equipamentosAtuais)}</strong>equipamento(s)</div><div class="entity-metric"><strong>${fmtQty(c.emprestimosAbertos)}</strong>empréstimo(s)</div><div class="entity-metric"><strong>${fmtQty(c.acessoriosPendentes)}</strong>acessório(s)</div></div>
     <div class="entity-actions">
       <button type="button" class="btn btn-sm btn-secondary" data-action="filter-colaborador" data-name="${esc(c.nome)}">Ver equipamentos</button>
@@ -1043,7 +1078,7 @@ function renderCategoriesView() {
   const main = $('main');
   const list = state.data.categorias || [];
   main.innerHTML = `
-    <div class="page-head"><div><div class="eyebrow">Estrutura</div><h2>Estrutura do controle</h2><p>Cada categoria tem seu próprio rótulo de item. Códigos iguais em categorias diferentes não são o mesmo equipamento.</p></div><div class="page-actions">${isAdmin() ? `<button type="button" class="btn btn-primary" data-action="new-category">${icon('plus')} Nova categoria</button>` : ''}</div></div>
+    <div class="page-head"><div><div class="eyebrow">Estrutura</div><h2>Estrutura do controle</h2><p>Cada categoria tem seu próprio rótulo de item. Códigos iguais em categorias diferentes não são o mesmo equipamento.</p></div><div class="page-actions">${isAdmin() ? `<button type="button" class="btn btn-primary" data-action="new-category">${icon('plus')} Nova categoria/aba</button>` : ''}</div></div>
     ${list.length ? `<div class="entity-grid">${list.map(catCard).join('')}</div>` : `<div class="card">${emptyState('tag', 'Nenhuma categoria', 'Cadastre a primeira categoria.')}</div>`}
   `;
   hydrateIcons(main);
@@ -1052,7 +1087,7 @@ function renderCategoriesView() {
 function catCard(c) {
   const admin = isAdmin();
   return `<article class="entity-card" style="${c.ativo ? '' : 'opacity:.72;'}">
-    <div class="entity-head"><div><div class="entity-title">${esc(c.nome)}</div><div class="entity-sub">Prefixo ${esc(c.prefixo || '—')} · campo “${esc(c.campoItem || 'ITEM')}”</div></div><span class="badge ${c.ativo ? 'green' : 'gray'}">${c.ativo ? 'Ativa' : 'Inativa'}</span></div>
+    <div class="entity-head"><div><div class="entity-title">${esc(c.nome)}</div><div class="entity-sub">Prefixo ${esc(c.prefixo || '—')} · campo “${esc(c.campoItem || 'ITEM')}”${c.nomeAba ? ' · aba ' + esc(c.nomeAba) : ''}</div></div><span class="badge ${c.ativo ? 'green' : 'gray'}">${c.ativo ? 'Ativa' : 'Inativa'}</span></div>
     <div class="entity-metrics"><div class="entity-metric"><strong>${fmtQty(c.quantidadeEquipamentos)}</strong>cadastro(s)</div><div class="entity-metric"><strong>${fmtQty(c.quantidadeDisponivel)}</strong>disponível(is)</div><div class="entity-metric"><strong>${fmtQty(c.quantidadeEntregue)}</strong>entregue(s)</div><div class="entity-metric"><strong>${fmtQty(c.quantidadeManutencao)}</strong>manutenção</div></div>
     ${c.observacaoImportacao ? `<div class="entity-note">${esc(c.observacaoImportacao)}</div>` : ''}
     ${c.observacaoOrigem ? `<div class="small muted">Observação da origem: ${esc(c.observacaoOrigem)}</div>` : ''}
@@ -1070,15 +1105,17 @@ function renderUsersView() {
   if (!isAdmin()) { setView('dashboard'); return; }
   const main = $('main');
   const users = state.data.usuarios || [];
+  const pendentes = users.filter((u) => u.status === 'PENDENTE');
   main.innerHTML = `
-    <div class="page-head"><div><div class="eyebrow">Segurança</div><h2>Acessos e permissões</h2><p>Contas de acesso ao sistema. Colaboradores cadastrados no controle de equipamentos não recebem acesso automaticamente.</p></div><div class="page-actions"><button type="button" class="btn btn-primary" data-action="new-user">${icon('userPlus')} Novo usuário</button></div></div>
+    <div class="page-head"><div><div class="eyebrow">Segurança</div><h2>Acessos e permissões</h2><p>Contas de acesso ao sistema. Cadastros feitos pela tela de login ficam pendentes até a aprovação do administrador.</p></div><div class="page-actions"><button type="button" class="btn btn-primary" data-action="new-user">${icon('userPlus')} Novo usuário</button></div></div>
     <div class="users-toolbar">
-      <div class="flex flex-wrap"><span class="badge">${fmtQty(users.length)} conta(s)</span><span class="badge green">${fmtQty(users.filter((u) => u.status === 'ATIVO').length)} ativa(s)</span><span class="badge gray">${fmtQty(users.filter((u) => u.perfil === 'ADMINISTRADOR').length)} administrador(es)</span></div>
+      <div class="flex flex-wrap"><span class="badge">${fmtQty(users.length)} conta(s)</span><span class="badge green">${fmtQty(users.filter((u) => u.status === 'ATIVO').length)} ativa(s)</span><span class="badge gray">${fmtQty(users.filter((u) => u.perfil === 'ADMINISTRADOR').length)} administrador(es)</span>${pendentes.length ? `<span class="badge pending">${fmtQty(pendentes.length)} pendente(s)</span>` : ''}</div>
       <button type="button" class="btn btn-sm btn-secondary" id="toggleUsers" aria-expanded="${!state.usersCollapsed}">${state.usersCollapsed ? 'Mostrar lista' : 'Ocultar lista'}</button>
     </div>
+    ${pendentes.length ? `<div class="alert alert-warn users-pending">${icon('alert')}<div><strong>${fmtQty(pendentes.length)} cadastro(s) aguardando aprovação.</strong> Aprove para liberar o acesso somente de consulta.</div><button type="button" class="btn btn-sm btn-primary" data-action="show-pending">Mostrar pendentes</button></div>` : ''}
     <div id="usersList" class="${state.usersCollapsed ? 'users-collapsed' : ''}">
       ${users.length ? `<div class="user-list">${users.map(userRow).join('')}</div>` : `<div class="card">${emptyState('shield', 'Nenhuma conta', 'Crie o primeiro usuário.')}</div>`}
-      <div class="users-empty-hint">Lista de usuários oculta. Use “Mostrar lista” para exibir as contas.</div>
+      <div class="users-empty-hint">${pendentes.length ? `${fmtQty(pendentes.length)} cadastro(s) pendente(s). ` : ''}Lista de usuários oculta. Use “Mostrar lista” para exibir as contas.</div>
     </div>
   `;
   $('toggleUsers').addEventListener('click', () => {
@@ -1095,14 +1132,19 @@ function renderUsersView() {
 
 function userRow(u) {
   const self = state.user && u.id === state.user.id;
+  const pendente = u.status === 'PENDENTE';
+  const statusBadge = pendente
+    ? '<span class="badge pending">Pendente</span>'
+    : `<span class="badge ${u.status === 'ATIVO' ? 'green' : 'red'}">${u.status === 'ATIVO' ? 'Ativo' : 'Bloqueado'}</span>`;
   return `<div class="user-row">
     <span class="avatar">${esc(initials(u.nome))}</span>
     <div class="user-row-info"><strong>${esc(u.nome)}${self ? ' <span class="badge gray" style="font-size:9px;padding:2px 5px">você</span>' : ''}</strong><span>${esc(u.email)} · ${esc(roleLabel(u.perfil))}${u.ultimoAcesso ? ' · último acesso ' + esc(fmtDateTime(u.ultimoAcesso)) : ''}</span></div>
-    <span class="badge ${u.status === 'ATIVO' ? 'green' : 'red'}">${u.status === 'ATIVO' ? 'Ativo' : 'Bloqueado'}</span>
+    ${statusBadge}
     <div class="user-row-actions">
+      ${pendente ? `<button type="button" class="btn btn-sm btn-primary" data-action="approve-user" data-id="${esc(u.id)}">Aprovar</button><button type="button" class="btn btn-sm btn-ghost" data-action="reject-user" data-id="${esc(u.id)}">Recusar</button>` : ''}
       <button type="button" class="btn btn-sm btn-ghost" data-action="edit-user" data-id="${esc(u.id)}">Editar</button>
-      <button type="button" class="btn btn-sm btn-ghost" data-action="reset-user-password" data-id="${esc(u.id)}">Redefinir senha</button>
-      ${!self ? (u.status === 'ATIVO' ? `<button type="button" class="btn btn-sm btn-ghost" data-action="block-user" data-id="${esc(u.id)}">Bloquear</button>` : `<button type="button" class="btn btn-sm btn-ghost" data-action="unblock-user" data-id="${esc(u.id)}">Desbloquear</button>`) : ''}
+      ${!pendente ? `<button type="button" class="btn btn-sm btn-ghost" data-action="reset-user-password" data-id="${esc(u.id)}">Redefinir senha</button>` : ''}
+      ${!self && !pendente ? (u.status === 'ATIVO' ? `<button type="button" class="btn btn-sm btn-ghost" data-action="block-user" data-id="${esc(u.id)}">Bloquear</button>` : `<button type="button" class="btn btn-sm btn-ghost" data-action="unblock-user" data-id="${esc(u.id)}">Desbloquear</button>`) : ''}
     </div>
   </div>`;
 }
@@ -1279,7 +1321,7 @@ function manDetailItem(m) {
     <span class="pending-icon">${icon('wrench')}</span>
     <div class="pending-body">
       <div class="pending-title">${esc(m.status)} · ${esc(fmtDate(m.dataEnvio))}</div>
-      <div class="pending-sub">${esc(m.defeito || 'Sem defeito informado')}${m.responsavel ? ' · ' + esc(m.responsavel) : ''}${m.servico ? ' · ' + esc(m.servico) : ''}${m.custo !== '' ? ' · ' + fmtMoney(m.custo) : ''}</div>
+      <div class="pending-sub">${esc(m.defeito || 'Sem defeito informado')}${m.responsavel ? ' · ' + esc(m.responsavel) : ''}${m.celularResponsavel ? ' · ' + esc(m.celularResponsavel) : ''}${m.servico ? ' · ' + esc(m.servico) : ''}${m.custo !== '' ? ' · ' + fmtMoney(m.custo) : ''}</div>
       ${m.observacoes ? `<div class="small muted mt-8">${esc(m.observacoes)}</div>` : ''}
     </div>
     ${admin && m.aberta ? `<div class="pending-actions"><button type="button" class="btn btn-sm btn-secondary" data-action="edit-maintenance" data-id="${esc(m.id)}">Editar</button><button type="button" class="btn btn-sm btn-primary" data-action="conclude-maintenance" data-id="${esc(m.id)}">Concluir</button></div>` : ''}
@@ -1339,7 +1381,7 @@ async function runAction(btn, action, payload, opts) {
     const data = await api(action, payload, { requestId: rid });
     delete state.pendingRequestIds[ridKey];
     if (btn) delete btn.dataset.requestId;
-    await afterWrite(opts.successMsg, opts);
+    await afterWrite(opts.successMsg, Object.assign({}, opts, { avisos: data && data.avisos, _result: data }));
     return data;
   } catch (e) {
     if (opts.modal) showModalError(e.message);
@@ -1361,7 +1403,44 @@ async function afterWrite(message, opts) {
     renderCurrentView();
   }
   if (message) showToast(message, 'success');
-  if (typeof opts.onSuccess === 'function') opts.onSuccess();
+  if (opts.avisos && opts.avisos.length) showToast(opts.avisos.join(' '), 'error');
+  if (typeof opts.onSuccess === 'function') opts.onSuccess(opts._result);
+}
+
+async function doSyncSheet(btn) {
+  if (!btn || btn.disabled) return;
+  let rid = btn.dataset.requestId;
+  if (!rid) { rid = genId(); btn.dataset.requestId = rid; }
+  setButtonBusy(btn, true);
+  try {
+    const data = await api('sincronizarTudo', {}, { requestId: rid });
+    delete btn.dataset.requestId;
+    await refreshData({ silent: true, keepModal: true });
+    renderCurrentView();
+    openSyncReport(data);
+    showToast('Sincronização da planilha concluída.', 'success');
+  } catch (e) {
+    showToast(e.message, 'error');
+  } finally {
+    setButtonBusy(btn, false);
+  }
+}
+
+function openSyncReport(data) {
+  const erros = data.erros || [];
+  openModal({
+    title: 'Sincronização da planilha',
+    subtitle: 'As abas originais foram conferidas e atualizadas a partir do estado atual do sistema.',
+    size: 'lg',
+    body: `<div class="grid-3">
+        <div class="stat-card"><div class="stat-label">Equipamentos</div><div class="stat-value">${fmtQty(data.equipamentosSincronizados || 0)}</div><div class="stat-meta">de ${fmtQty(data.total || 0)} sincronizados</div></div>
+        <div class="stat-card gold"><div class="stat-label">Abas criadas</div><div class="stat-value">${fmtQty(data.abasCriadas || 0)}</div><div class="stat-meta">novas abas de categoria</div></div>
+        <div class="stat-card ${erros.length ? 'red' : 'green'}"><div class="stat-label">Erros</div><div class="stat-value">${fmtQty(erros.length)}</div><div class="stat-meta">${erros.length ? 'verifique abaixo' : 'nenhum'}</div></div>
+      </div>
+      ${erros.length ? `<div class="alert alert-danger mt-16">${icon('alert')}<div><strong>Alguns itens não foram sincronizados.</strong><br>${erros.map((e) => esc((e.codigo || e.categoria || 'Item') + ': ' + e.erro)).join('<br>')}</div></div>` : `<div class="alert alert-success mt-16">${icon('check')}<div>Todas as abas originais confirmaram a gravação. Histórico preservado nas abas de movimentações.</div></div>`}
+      <div class="small muted mt-12">Última sincronização: ${esc(fmtDateTime(data.quando))}</div>`,
+    foot: `<button type="button" class="btn btn-secondary" data-action="close-modal">Fechar</button>`
+  });
 }
 
 /* ---------- Formulários ---------- */
@@ -1410,7 +1489,7 @@ async function submitModalForm(form, action, payloadFn, opts) {
   try {
     const data = await api(action, payload, { requestId: rid });
     form.dataset.requestId = '';
-    await afterWrite(opts.successMsg, opts);
+    await afterWrite(opts.successMsg, Object.assign({}, opts, { avisos: data && data.avisos, _result: data }));
     return data;
   } catch (e) {
     showModalError(e.message);
@@ -1507,7 +1586,6 @@ function openDeliveryModal(equipmentId) {
   const eqs = (state.data.equipamentos || []).filter((e) => e.podeEntregar);
   const cols = (state.data.colaboradores || []).filter((c) => c.ativo);
   if (!eqs.length) { openModal({ title: 'Nenhum equipamento disponível', size: 'sm', body: `<div class="alert alert-warn">${icon('alert')}<div>Não há equipamento disponível para entrega. Registre uma devolução ou cadastre um novo equipamento.</div></div>`, foot: `<button type="button" class="btn btn-secondary" data-action="close-modal">Fechar</button>` }); return; }
-  if (!cols.length) { openModal({ title: 'Nenhum colaborador ativo', size: 'sm', body: `<div class="alert alert-warn">${icon('alert')}<div>Cadastre um colaborador antes de registrar a entrega.</div></div>`, foot: `<button type="button" class="btn btn-secondary" data-action="close-modal">Fechar</button><button type="button" class="btn btn-primary" data-action="new-collaborator">Cadastrar colaborador</button>` }); return; }
   const selected = equipmentId || (eqs[0] && eqs[0].id);
   const eq = eqs.find((x) => x.id === selected) || eqs[0];
   openModal({
@@ -1519,7 +1597,7 @@ function openDeliveryModal(equipmentId) {
         <div class="form-section-title">${icon('drill')} Equipamento e responsável</div>
         <label class="field"><span>Equipamento <b class="required"></b></span><select name="equipamentoId" id="deliveryEquipment" required>${eqs.map((x) => `<option value="${esc(x.id)}" ${x.id === eq.id ? 'selected' : ''}>${esc(x.codigo)} — ${esc(x.nome)} · ${fmtQty(x.quantidadeDisponivel)} disp.</option>`).join('')}</select></label>
         <div class="form-row">
-          <label class="field"><span>Colaborador <b class="required"></b></span><select name="colaboradorId" required><option value="">Selecione…</option>${cols.map((c) => `<option value="${esc(c.id)}">${esc(c.nome)}${c.localObra ? ' — ' + esc(c.localObra) : ''}</option>`).join('')}</select></label>
+          <label class="field"><span>Responsável <b class="required"></b></span><input name="colaboradorNome" list="deliveryColabList" autocomplete="off" placeholder="Digite um nome ou escolha uma sugestão" required><datalist id="deliveryColabList">${cols.map((c) => `<option value="${esc(c.nome)}"></option>`).join('')}</datalist><span class="form-help">Pode digitar um nome novo. Ele será cadastrado como colaborador, sem criar acesso ao sistema.</span></label>
           <label class="field"><span>Data da entrega <b class="required"></b></span><input name="data" type="date" value="${todayIso()}" required></label>
         </div>
         <div class="form-row">
@@ -1557,10 +1635,10 @@ function openDeliveryModal(equipmentId) {
       $('deliveryForm').addEventListener('submit', (ev) => {
         ev.preventDefault();
         const form = ev.currentTarget;
-        if (!validateRequired(form, ['colaboradorId', 'data', 'quantidade'])) return;
+        if (!validateRequired(form, ['colaboradorNome', 'data', 'quantidade'])) return;
         const payload = {
           equipamentoId: formVal(form, 'equipamentoId'),
-          colaboradorId: formVal(form, 'colaboradorId'),
+          colaboradorNome: formVal(form, 'colaboradorNome'),
           data: formVal(form, 'data'),
           quantidade: formNum(form, 'quantidade'),
           estadoConservacao: formVal(form, 'estadoConservacao'),
@@ -1650,14 +1728,13 @@ function openTransferModal(loanId) {
   const selected = loanId || (loans[0] && loans[0].id);
   const loan = loans.find((l) => l.id === selected) || loans[0];
   const cols = (state.data.colaboradores || []).filter((c) => c.ativo && c.id !== loan.colaboradorId);
-  if (!cols.length) { openModal({ title: 'Sem outro colaborador ativo', size: 'sm', body: `<div class="alert alert-warn">${icon('alert')}<div>Cadastre outro colaborador ativo para transferir.</div></div>`, foot: `<button type="button" class="btn btn-secondary" data-action="close-modal">Fechar</button>` }); return; }
   openModal({
     title: 'Transferir responsável',
     subtitle: 'O histórico anterior é preservado. Uma nova responsabilidade é criada para o novo colaborador.',
     body: `<form id="transferForm" class="form-stack" novalidate>
       <label class="field"><span>Empréstimo <b class="required"></b></span><select name="emprestimoId" id="transferLoan" required>${loans.map((l) => `<option value="${esc(l.id)}" ${l.id === loan.id ? 'selected' : ''}>${esc(l.equipamentoCodigo)} — ${esc(l.colaboradorNome)} · ${plural(l.quantidade, 'unidade', 'unidades')}</option>`).join('')}</select></label>
       <div class="form-row">
-        <label class="field"><span>Novo responsável <b class="required"></b></span><select name="novoColaboradorId" id="transferNewColab" required>${cols.map((c) => `<option value="${esc(c.id)}">${esc(c.nome)}${c.localObra ? ' — ' + esc(c.localObra) : ''}</option>`).join('')}</select></label>
+        <label class="field"><span>Novo responsável <b class="required"></b></span><input name="novoColaboradorNome" id="transferNewColab" list="transferColabList" autocomplete="off" placeholder="Digite um nome ou escolha uma sugestão" required><datalist id="transferColabList">${cols.map((c) => `<option value="${esc(c.nome)}"></option>`).join('')}</datalist><span class="form-help">Pode digitar um nome novo. Ele será cadastrado como colaborador, sem criar acesso ao sistema.</span></label>
         <label class="field"><span>Data da transferência <b class="required"></b></span><input name="data" type="date" value="${todayIso()}" required></label>
       </div>
       <div id="transferInfo" class="alert alert-info"></div>
@@ -1669,7 +1746,8 @@ function openTransferModal(loanId) {
         const l = loans.find((x) => x.id === $('transferLoan').value);
         if (!l) return;
         const opts = (state.data.colaboradores || []).filter((c) => c.ativo && c.id !== l.colaboradorId);
-        $('transferNewColab').innerHTML = opts.map((c) => `<option value="${esc(c.id)}">${esc(c.nome)}${c.localObra ? ' — ' + esc(c.localObra) : ''}</option>`).join('');
+        $('transferNewColab').value = '';
+        $('transferColabList').innerHTML = opts.map((c) => `<option value="${esc(c.nome)}"></option>`).join('');
         $('transferInfo').innerHTML = `<div><strong>${esc(l.equipamentoCodigo)}</strong> está com <strong>${esc(l.colaboradorNome)}</strong>. ${plural(l.quantidade, 'unidade', 'unidades')}${l.totalPendente ? ' e ' + plural(l.totalPendente, 'acessório pendente', 'acessórios pendentes') : ''} serão transferidos.</div>`;
       };
       $('transferLoan').addEventListener('change', update);
@@ -1677,8 +1755,8 @@ function openTransferModal(loanId) {
       $('transferForm').addEventListener('submit', (ev) => {
         ev.preventDefault();
         const form = ev.currentTarget;
-        if (!validateRequired(form, ['novoColaboradorId', 'data'])) return;
-        const payload = { emprestimoId: formVal(form, 'emprestimoId'), novoColaboradorId: formVal(form, 'novoColaboradorId'), data: formVal(form, 'data'), observacoes: formVal(form, 'observacoes') };
+        if (!validateRequired(form, ['novoColaboradorNome', 'data'])) return;
+        const payload = { emprestimoId: formVal(form, 'emprestimoId'), novoColaboradorNome: formVal(form, 'novoColaboradorNome'), data: formVal(form, 'data'), observacoes: formVal(form, 'observacoes') };
         const l = loans.find((x) => x.id === payload.emprestimoId);
         submitModalForm(form, 'registrarTransferencia', () => payload, { successMsg: 'Transferência registrada.', detailId: l ? l.equipamentoId : null });
       });
@@ -1703,13 +1781,14 @@ function openMaintenanceForm(equipmentId) {
         <label class="field"><span>Equipamento <b class="required"></b></span><select name="equipamentoId" required>${eqs.map((x) => `<option value="${esc(x.id)}" ${x.id === eq.id ? 'selected' : ''}>${esc(x.codigo)} — ${esc(x.nome)}</option>`).join('')}</select></label>
         <div class="form-row">
           <label class="field"><span>Data de envio <b class="required"></b></span><input name="dataEnvio" type="date" value="${todayIso()}" required></label>
+          <label class="field"><span>Previsão de retorno</span><input name="previsaoRetorno" type="date"></label>
+        </div>
+        <div class="form-row">
           <label class="field"><span>Responsável / assistência</span><input name="responsavel" placeholder="Oficina, técnico ou empresa"></label>
+          <label class="field"><span>Celular do responsável/assistência</span><input name="celularResponsavel" type="tel" inputmode="tel" placeholder="(00) 00000-0000"></label>
         </div>
         <label class="field"><span>Defeito ou motivo <b class="required"></b></span><textarea name="defeito" placeholder="Descreva o defeito ou o serviço necessário" required></textarea></label>
-        <div class="form-row">
-          <label class="field"><span>Previsão de retorno</span><input name="previsaoRetorno" type="date"></label>
-          <label class="field"><span>Custo estimado (R$)</span><input name="custo" type="number" min="0" step="0.01" placeholder="0,00"></label>
-        </div>
+        <label class="field"><span>Custo estimado (R$)</span><input name="custo" type="number" min="0" step="0.01" placeholder="0,00"></label>
       </div>
       <label class="field"><span>Observações</span><textarea name="observacoes" placeholder="Informações adicionais"></textarea></label>
     </form>`,
@@ -1719,7 +1798,7 @@ function openMaintenanceForm(equipmentId) {
         ev.preventDefault();
         const form = ev.currentTarget;
         if (!validateRequired(form, ['dataEnvio', 'defeito'])) return;
-        const payload = { equipamentoId: formVal(form, 'equipamentoId'), dataEnvio: formVal(form, 'dataEnvio'), defeito: formVal(form, 'defeito'), responsavel: formVal(form, 'responsavel'), previsaoRetorno: formVal(form, 'previsaoRetorno'), custo: formVal(form, 'custo'), observacoes: formVal(form, 'observacoes') };
+        const payload = { equipamentoId: formVal(form, 'equipamentoId'), dataEnvio: formVal(form, 'dataEnvio'), defeito: formVal(form, 'defeito'), responsavel: formVal(form, 'responsavel'), celularResponsavel: formVal(form, 'celularResponsavel'), previsaoRetorno: formVal(form, 'previsaoRetorno'), custo: formVal(form, 'custo'), observacoes: formVal(form, 'observacoes') };
         submitModalForm(form, 'abrirManutencao', () => payload, { successMsg: 'Equipamento enviado para manutenção.', detailId: payload.equipamentoId });
       });
     },
@@ -1746,12 +1825,13 @@ function openMaintenanceEdit(id) {
         <label class="field"><span>Situação</span><select name="status"><option value="ABERTA" ${man.status === 'ABERTA' ? 'selected' : ''}>Aberta</option><option value="EM_ANDAMENTO" ${man.status === 'EM_ANDAMENTO' ? 'selected' : ''}>Em andamento</option></select></label>
         <label class="field"><span>Responsável / assistência</span><input name="responsavel" value="${esc(man.responsavel || '')}"></label>
       </div>
+      <div class="form-row">
+        <label class="field"><span>Celular do responsável/assistência</span><input name="celularResponsavel" type="tel" inputmode="tel" value="${esc(man.celularResponsavel || '')}" placeholder="(00) 00000-0000"></label>
+        <label class="field"><span>Previsão de retorno</span><input name="previsaoRetorno" type="date" value="${esc(man.previsaoRetorno || '')}"></label>
+      </div>
       <label class="field"><span>Defeito ou motivo</span><textarea name="defeito">${esc(man.defeito || '')}</textarea></label>
       <label class="field"><span>Serviço realizado</span><textarea name="servico">${esc(man.servico || '')}</textarea></label>
-      <div class="form-row">
-        <label class="field"><span>Previsão de retorno</span><input name="previsaoRetorno" type="date" value="${esc(man.previsaoRetorno || '')}"></label>
-        <label class="field"><span>Custo (R$)</span><input name="custo" type="number" min="0" step="0.01" value="${man.custo === '' ? '' : esc(man.custo)}"></label>
-      </div>
+      <label class="field"><span>Custo (R$)</span><input name="custo" type="number" min="0" step="0.01" value="${man.custo === '' ? '' : esc(man.custo)}"></label>
       <label class="field"><span>Observações</span><textarea name="observacoes">${esc(man.observacoes || '')}</textarea></label>
     </form>`,
     foot: `<button type="button" class="btn btn-ghost" data-action="close-modal">Cancelar</button><button type="submit" form="maintenanceEditForm" class="btn btn-primary">Salvar</button>`,
@@ -1759,7 +1839,7 @@ function openMaintenanceEdit(id) {
       $('maintenanceEditForm').addEventListener('submit', (ev) => {
         ev.preventDefault();
         const form = ev.currentTarget;
-        const payload = { id: man.id, status: formVal(form, 'status'), responsavel: formVal(form, 'responsavel'), defeito: formVal(form, 'defeito'), servico: formVal(form, 'servico'), previsaoRetorno: formVal(form, 'previsaoRetorno'), custo: formVal(form, 'custo'), observacoes: formVal(form, 'observacoes') };
+        const payload = { id: man.id, status: formVal(form, 'status'), responsavel: formVal(form, 'responsavel'), celularResponsavel: formVal(form, 'celularResponsavel'), defeito: formVal(form, 'defeito'), servico: formVal(form, 'servico'), previsaoRetorno: formVal(form, 'previsaoRetorno'), custo: formVal(form, 'custo'), observacoes: formVal(form, 'observacoes') };
         submitModalForm(form, 'atualizarManutencao', () => payload, { successMsg: 'Manutenção atualizada.', detailId: man.equipamentoId, detailTab: 'manutencoes' });
       });
     },
@@ -1783,9 +1863,10 @@ function openMaintenanceConclude(id) {
       </div>
       <label class="field"><span>Serviço realizado</span><textarea name="servico" placeholder="O que foi feito">${esc(man.servico || '')}</textarea></label>
       <div class="form-row">
-        <label class="field"><span>Custo final (R$)</span><input name="custo" type="number" min="0" step="0.01" value="${man.custo === '' ? '' : esc(man.custo)}"></label>
-        <label class="field"><span>Responsável</span><input value="${esc(man.responsavel || '—')}" disabled></label>
+        <label class="field"><span>Responsável / assistência</span><input value="${esc(man.responsavel || '—')}" disabled></label>
+        <label class="field"><span>Celular do responsável/assistência</span><input name="celularResponsavel" type="tel" inputmode="tel" value="${esc(man.celularResponsavel || '')}" placeholder="(00) 00000-0000"></label>
       </div>
+      <label class="field"><span>Custo final (R$)</span><input name="custo" type="number" min="0" step="0.01" value="${man.custo === '' ? '' : esc(man.custo)}"></label>
       <label class="field"><span>Observações</span><textarea name="observacoes">${esc(man.observacoes || '')}</textarea></label>
     </form>`,
     foot: `<button type="button" class="btn btn-ghost" data-action="close-modal">Cancelar</button><button type="submit" form="maintenanceConcludeForm" class="btn btn-primary">Concluir e liberar</button>`,
@@ -1794,7 +1875,7 @@ function openMaintenanceConclude(id) {
         ev.preventDefault();
         const form = ev.currentTarget;
         if (!validateRequired(form, ['dataRetorno'])) return;
-        const payload = { id: man.id, dataRetorno: formVal(form, 'dataRetorno'), estadoRetorno: formVal(form, 'estadoRetorno'), servico: formVal(form, 'servico'), custo: formVal(form, 'custo'), observacoes: formVal(form, 'observacoes') };
+        const payload = { id: man.id, dataRetorno: formVal(form, 'dataRetorno'), estadoRetorno: formVal(form, 'estadoRetorno'), servico: formVal(form, 'servico'), custo: formVal(form, 'custo'), celularResponsavel: formVal(form, 'celularResponsavel'), observacoes: formVal(form, 'observacoes') };
         submitModalForm(form, 'concluirManutencao', () => payload, { successMsg: 'Manutenção concluída. Equipamento disponível.', detailId: man.equipamentoId, detailTab: 'manutencoes' });
       });
     },
@@ -1843,7 +1924,10 @@ function openCollaboratorForm(c) {
         <label class="field"><span>Telefone</span><input name="telefone" value="${esc(e.telefone || '')}" placeholder="(00) 00000-0000"></label>
         <label class="field"><span>E-mail</span><input name="email" type="email" value="${esc(e.email || '')}" placeholder="opcional"></label>
       </div>
-      <label class="field"><span>Local / obra</span><input name="localObra" value="${esc(e.localObra || '')}" placeholder="Obra, setor ou local"></label>
+      <div class="form-row">
+        <label class="field"><span>Local / obra</span><input name="localObra" value="${esc(e.localObra || '')}" placeholder="Obra ou local"></label>
+        <label class="field"><span>Setor</span><input name="setor" value="${esc(e.setor || '')}" placeholder="Ex.: Produção, Almoxarifado"></label>
+      </div>
       <label class="field"><span>Observações</span><textarea name="observacoes" placeholder="Informações adicionais">${esc(e.observacoes || '')}</textarea></label>
     </form>`,
     foot: `<button type="button" class="btn btn-ghost" data-action="close-modal">Cancelar</button><button type="submit" form="collaboratorForm" class="btn btn-primary">${editing ? 'Salvar' : 'Cadastrar'}</button>`,
@@ -1852,7 +1936,7 @@ function openCollaboratorForm(c) {
         ev.preventDefault();
         const form = ev.currentTarget;
         if (!validateRequired(form, ['nome'])) return;
-        const payload = { nome: formVal(form, 'nome'), tipo: formVal(form, 'tipo'), funcao: formVal(form, 'funcao'), telefone: formVal(form, 'telefone'), email: formVal(form, 'email'), localObra: formVal(form, 'localObra'), observacoes: formVal(form, 'observacoes') };
+        const payload = { nome: formVal(form, 'nome'), tipo: formVal(form, 'tipo'), funcao: formVal(form, 'funcao'), telefone: formVal(form, 'telefone'), email: formVal(form, 'email'), localObra: formVal(form, 'localObra'), setor: formVal(form, 'setor'), observacoes: formVal(form, 'observacoes') };
         if (editing) payload.id = c.id;
         submitModalForm(form, editing ? 'editarColaborador' : 'criarColaborador', () => payload, { successMsg: editing ? 'Colaborador atualizado.' : 'Colaborador cadastrado.' });
       });
@@ -1865,10 +1949,11 @@ function openCategoryForm(c) {
   const editing = !!c;
   const e = c || { ordem: (state.data.categorias || []).length + 1, campoItem: 'ITEM' };
   openModal({
-    title: editing ? 'Editar categoria' : 'Nova categoria',
-    subtitle: 'O prefixo é usado na geração automática de códigos.',
+    title: editing ? 'Editar categoria' : 'Nova categoria/aba',
+    subtitle: editing ? 'A categoria mantém a aba já vinculada à planilha.' : 'A nova categoria cria uma aba própria na planilha e fica disponível para novos equipamentos.',
     size: 'sm',
     body: `<form id="categoryForm" class="form-stack" novalidate>
+      ${editing ? `<div class="alert alert-info">${icon('info')}<div>Aba vinculada: <strong>${esc(c.nomeAba || 'não definida')}</strong>. Renomear a categoria não renomeia a aba automaticamente.</div></div>` : `<div class="alert alert-info">${icon('info')}<div>Uma nova aba será criada na planilha com o nome da categoria. Nomes duplicados e caracteres inválidos serão bloqueados.</div></div>`}
       <label class="field"><span>Nome <b class="required"></b></span><input name="nome" value="${esc(e.nome || '')}" placeholder="Ex.: Serra circular" required></label>
       <div class="form-row">
         <label class="field"><span>Prefixo <b class="required"></b></span><input name="prefixo" value="${esc(e.prefixo || '')}" maxlength="6" placeholder="Ex.: SCI" required></label>
@@ -1877,7 +1962,7 @@ function openCategoryForm(c) {
       <label class="field"><span>Rótulo do item</span><input name="campoItem" value="${esc(e.campoItem || 'ITEM')}" placeholder="Ex.: SERRA CIRCULAR"></label>
       <div class="form-help">Cada categoria pode ter um rótulo próprio. Códigos iguais em categorias diferentes não são o mesmo equipamento.</div>
     </form>`,
-    foot: `<button type="button" class="btn btn-ghost" data-action="close-modal">Cancelar</button><button type="submit" form="categoryForm" class="btn btn-primary">${editing ? 'Salvar' : 'Cadastrar'}</button>`,
+    foot: `<button type="button" class="btn btn-ghost" data-action="close-modal">Cancelar</button><button type="submit" form="categoryForm" class="btn btn-primary">${editing ? 'Salvar' : 'Criar categoria/aba'}</button>`,
     onMount: () => {
       $('categoryForm').addEventListener('submit', (ev) => {
         ev.preventDefault();
@@ -1900,7 +1985,7 @@ function openUserForm(u) {
     subtitle: editing ? 'A alteração de perfil encerra as sessões abertas desse usuário.' : 'A conta é separada do cadastro de colaborador.',
     body: `<form id="userForm" class="form-stack" novalidate>
       <label class="field"><span>Nome <b class="required"></b></span><input name="nome" value="${esc(e.nome || '')}" required></label>
-      <label class="field"><span>E-mail de acesso <b class="required"></b></span><input name="email" type="email" value="${esc(e.email || '')}" required></label>
+      <label class="field"><span>Usuário ou e-mail <b class="required"></b></span><input name="email" type="text" inputmode="text" autocomplete="username" value="${esc(e.email || '')}" required></label>
       <label class="field"><span>Perfil</span><select name="perfil"><option value="COLABORADOR" ${e.perfil === 'COLABORADOR' ? 'selected' : ''}>Colaborador — somente consulta</option><option value="ADMINISTRADOR" ${e.perfil === 'ADMINISTRADOR' ? 'selected' : ''}>Administrador — acesso completo</option></select></label>
       ${editing ? '' : `<div class="form-row"><label class="field"><span>Senha inicial <b class="required"></b></span><input name="senha" type="password" autocomplete="new-password" placeholder="Mínimo 8 caracteres" required></label><label class="field"><span>Confirmar senha <b class="required"></b></span><input name="senha2" type="password" autocomplete="new-password" placeholder="Repita a senha" required></label></div>`}
       <label class="field"><span>Observações</span><textarea name="observacoes" placeholder="Opcional">${esc(e.observacoes || '')}</textarea></label>
@@ -2026,6 +2111,7 @@ document.addEventListener('click', async (ev) => {
     if (action === 'close-modal') { closeModal(); return; }
     if (action === 'close-detail') { closeDetail(); return; }
     if (action === 'refresh') { try { await refreshData(); showToast('Dados atualizados.', 'success'); } catch (e) {} return; }
+    if (action === 'sync-sheet') { doSyncSheet(actionEl); return; }
     if (action === 'open-equipment') { openEquipment(id); return; }
     if (action === 'deliver-equipment') { openDeliveryModal(id); return; }
     if (action === 'return-equipment') {
@@ -2055,6 +2141,23 @@ document.addEventListener('click', async (ev) => {
     if (action === 'new-user') { openUserForm(); return; }
     if (action === 'edit-user') { const u = (state.data.usuarios || []).find((x) => x.id === id); if (u) openUserForm(u); return; }
     if (action === 'reset-user-password') { const u = (state.data.usuarios || []).find((x) => x.id === id); if (u) openResetPassword(u); return; }
+    if (action === 'approve-user') {
+      const u = (state.data.usuarios || []).find((x) => x.id === id);
+      if (u) runAction(actionEl, 'aprovarUsuario', { id }, { successMsg: 'Cadastro aprovado. O usuário já pode entrar.' });
+      return;
+    }
+    if (action === 'reject-user') {
+      const u = (state.data.usuarios || []).find((x) => x.id === id);
+      if (u) openConfirm({ title: 'Recusar cadastro', message: `Recusar o cadastro de <strong>${esc(u.nome)}</strong>? A conta ficará bloqueada e não poderá entrar.`, confirmLabel: 'Recusar', danger: true, action: 'bloquearUsuario', payload: { id }, successMsg: 'Cadastro recusado.' });
+      return;
+    }
+    if (action === 'show-pending') {
+      state.usersCollapsed = false;
+      localStorage.setItem(USERS_COLLAPSED_KEY, '0');
+      if (state.view === 'usuarios') renderUsersView();
+      setTimeout(() => { const el = $('usersList'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 120);
+      return;
+    }
     if (action === 'block-user') {
       const u = (state.data.usuarios || []).find((x) => x.id === id);
       if (u) openConfirm({ title: 'Bloquear usuário', message: `Bloquear <strong>${esc(u.nome)}</strong>? As sessões abertas serão encerradas.`, confirmLabel: 'Bloquear', danger: true, action: 'bloquearUsuario', payload: { id }, successMsg: 'Usuário bloqueado.' });
@@ -2164,11 +2267,21 @@ function bindStaticEvents() {
   $('loginForm').addEventListener('submit', doLogin);
   $('setupForm').addEventListener('submit', doSetup);
   $('recoveryForm').addEventListener('submit', doRecovery);
+  $('signupForm').addEventListener('submit', doSignup);
   $('showRecovery').addEventListener('click', () => showAuth('recovery'));
   $('backToLogin').addEventListener('click', () => showAuth('login'));
   $('retrySetupStatus').addEventListener('click', checkInitial);
-  $('showHelpLogin').addEventListener('click', () => openHelp('install'));
   $('helpBtn').addEventListener('click', () => openHelp());
+  $('authInstallBtn').addEventListener('click', async () => {
+    if (state.deferredPrompt) {
+      state.deferredPrompt.prompt();
+      await state.deferredPrompt.userChoice;
+      state.deferredPrompt = null;
+      $('installAppBtn').hidden = true;
+    } else {
+      openHelp('install');
+    }
+  });
   $('menuBtn').addEventListener('click', openSidebar);
   $('sidebarClose').addEventListener('click', closeSidebar);
   $('sidebarBackdrop').addEventListener('click', closeSidebar);

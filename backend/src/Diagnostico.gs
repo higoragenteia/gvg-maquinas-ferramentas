@@ -67,3 +67,16 @@ function diagnosticoSetup() {
   }, null, 2));
   return st;
 }
+
+/**
+ * Executa a sincronização das abas originais pelo editor, sem precisar do app.
+ * Use depois de uma manutenção manual na planilha.
+ */
+function sincronizarPlanilhaEditor() {
+  const r = sincronizarTudoInterno(
+    { id: 'EDITOR', email: 'EDITOR', perfil: PERFIL.ADMIN },
+    'EDITOR-' + Date.now()
+  );
+  Logger.log(JSON.stringify(r, null, 2));
+  return r;
+}

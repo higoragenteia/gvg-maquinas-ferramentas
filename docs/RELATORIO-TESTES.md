@@ -184,6 +184,27 @@ Todos foram corrigidos e os testes finais passaram.
 - Recuperação de senha por e-mail (não usada; a recuperação é por código no editor).
 - Volume muito alto de registros (o projeto foi paginado, mas o volume atual é pequeno).
 
-## 11. Conclusão
+## 11. Ajustes de sincronização, cadastro e nova aba (03/11/2026)
+
+Testes executados em cópia de teste com backend real e frontend de teste:
+
+- Setup com sincronização em lote: concluído em **28,6 segundos** para 51 equipamentos; o frontend aguarda até 120 segundos.
+- Aba original `MARTELETE` linha do PEDA: responsável atual removido, cor verde, data de devolução preservada.
+- Aba original `PARAFUSADEIRA`: responsável/entrega/devolução atualizados a partir do empréstimo; nome histórico mantido em `EMPRESTIMOS`/`MOVIMENTACOES`.
+- Entrega para `JOÃO DA OBRA`, nome que não existia: colaborador criado automaticamente, sem conta de usuário.
+- Nome repetido com diferença de caixa/espaços: reaproveitou o colaborador existente, sem duplicar.
+- Colaborador inativo: entrega bloqueada com `COLABORADOR_INATIVO`.
+- Transferência para `OUTRO NOVO`: colaborador criado automaticamente e aba original atualizada.
+- Nova categoria `BETONEIRA UI` / prefixo `BEU`: aba criada com cabeçalho `BETONEIRA`, 50 linhas numeradas e equipamento `BEU-001` sincronizado.
+- Devolução completa: aba da nova categoria com responsável vazio, cor verde, `ENTREGA` e `DEVOLUÇÃO` corretas.
+- Manutenção com celular `(11) 99999-0000`, edição para `(11) 98888-1111` e conclusão com `(11) 97777-2222`: gravado na coluna `CELULAR_RESPONSAVEL`.
+- Auto cadastro de teste com senha simples `12345`: criado como `PENDENTE`; login bloqueado com “aguardando aprovação”; aprovado pelo administrador; login liberado; sem acesso de escrita.
+- Botão **Sincronizar planilha**: relatório 51/51, 0 erros; abas originais confirmadas.
+- Datas corrigidas para não deslocar um dia entre o fuso do Apps Script e o da planilha.
+- Layout: ações rápidas no topo no desktop e no celular; instalação do app na tela de login; cadastro abaixo do login; lista de usuários com pendentes e botão de ocultar.
+
+A produção já possui administrador criado pelo proprietário. A sincronização inicial das abas originais da produção é executada automaticamente na primeira abertura do administrador após esta atualização; não foi criada uma sessão de teste na produção.
+
+## 12. Conclusão
 
 O que foi implementado e testado está funcional no ambiente real de teste. A produção foi estruturada com os dados importados e está pronta para o primeiro administrador, sem dados de teste. As pendências reais são a criação do administrador de produção pelo proprietário e a confirmação de instalação nos aparelhos físicos Android/iPhone.
