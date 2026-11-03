@@ -254,17 +254,8 @@ function setupAdmin(payload, requestId) {
     cacheRemove('setup_fail');
     const sess = criarSessao(u, payload.userAgent, requestId);
     audit({ id: u.ID, email: u.EMAIL, perfil: u.PERFIL }, 'SETUP_ADMIN', 'USUARIO', u.ID, { email: email }, requestId);
-    const avisos = [];
-    try {
-      const sync = sincronizarTudoInterno({ id: u.ID, email: u.EMAIL, perfil: u.PERFIL }, requestId);
-      if (sync.erros && sync.erros.length) {
-        avisos.push('Administrador criado, mas ' + sync.erros.length + ' equipamento(s) não puderam ser sincronizados com as abas originais. Use Sincronizar planilha.');
-      }
-    } catch (e) {
-      console.error('Falha na sincronização inicial: ' + e);
-      avisos.push('Administrador criado, mas a sincronização inicial das abas originais falhou. Use Sincronizar planilha.');
-    }
-    return { token: sess.token, expiraEm: sess.expiraEm, usuario: usuarioPublico(u), avisos: avisos };
+    // A sincronização inicial roda em segundo plano após o painel abrir.
+    return { token: sess.token, expiraEm: sess.expiraEm, usuario: usuarioPublico(u), avisos: [], precisaSincronizacao: true };
   });
 }
 

@@ -44,7 +44,7 @@ Execute no editor do Apps Script (não são rotas públicas):
 
 - Nenhuma senha em texto puro.
 - Hash SHA-256 iterado 1.500 vezes com sal aleatório.
-- Sessões de 12 horas; somente o hash do token é gravado.
+- Sessões de 10 anos; somente o hash do token é gravado. O F5 mantém a sessão; ela só termina no logout, bloqueio ou troca de perfil.
 - Permissões conferidas no servidor.
 - Setup e recuperação com códigos de uso único/curta duração, guardados como hash.
 - `LockService` nas escritas e idempotência por `requestId`.

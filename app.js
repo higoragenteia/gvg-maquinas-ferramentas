@@ -27,13 +27,22 @@ const state = {
   movPage: 1,
   movData: null,
   movLoading: false,
+  movCache: {},
+  movReq: 0,
   manFilters: { status: '', busca: '' },
   manData: null,
   manLoading: false,
+  manCache: {},
+  manReq: 0,
   auditBusca: '',
   auditPage: 1,
   auditData: null,
   auditLoading: false,
+  auditCache: {},
+  auditReq: 0,
+  listInflight: {},
+  syncRunning: false,
+  postLoadScheduled: false,
   colabSearch: '',
   usersCollapsed: localStorage.getItem(USERS_COLLAPSED_KEY) === '1',
   deferredPrompt: null,
@@ -211,7 +220,7 @@ function debounce(fn, ms) {
   let t;
   return function (...args) { clearTimeout(t); t = setTimeout(() => fn.apply(this, args), ms); };
 }
-function scrollTop() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
+function scrollTop() { window.scrollTo(0, 0); }
 function safeText(v) { return esc(v === undefined || v === null || v === '' ? '—' : v); }
 function daysBetween(iso) {
   const d = parseIsoDate(iso);
@@ -275,15 +284,23 @@ async function api(action, payload, opts) {
   return json.data;
 }
 
+function isAuthError(err) {
+  return !!err && ['NAO_AUTENTICADO', 'SESSAO_EXPIRADA', 'CONTA_BLOQUEADA'].indexOf(err.code) >= 0;
+}
+
 function handleAuthLost(message) {
-  localStorage.removeItem(TOKEN_KEY);
-  state.token = '';
+  saveToken('');
+  resetListCaches();
   state.data = null;
   state.user = null;
   closeModal();
   closeDetail();
   hideApp();
   showAuth('login', message || 'Sua sessão expirou. Entre novamente.', 'error');
+}
+
+function showConnectionError(message) {
+  showAuth('connection', message || 'Não foi possível conectar ao servidor. Sua sessão foi mantida.', 'error');
 }
 
 /* ---------- UI base ---------- */
@@ -337,10 +354,10 @@ function showAuth(mode, message, type) {
   hideApp();
   const auth = $('authView');
   if (auth) auth.classList.remove('hidden');
-  ['loginBox', 'setupBox', 'recoveryBox', 'setupPendingBox'].forEach((id) => {
+  ['loginBox', 'setupBox', 'recoveryBox', 'setupPendingBox', 'connectionBox'].forEach((id) => {
     const el = $(id); if (el) el.classList.add('hidden');
   });
-  const map = { login: 'loginBox', setup: 'setupBox', recovery: 'recoveryBox', pending: 'setupPendingBox' };
+  const map = { login: 'loginBox', setup: 'setupBox', recovery: 'recoveryBox', pending: 'setupPendingBox', connection: 'connectionBox' };
   const box = $(map[mode] || 'loginBox');
   if (box) box.classList.remove('hidden');
   if (mode === 'login') {
@@ -355,6 +372,10 @@ function showAuth(mode, message, type) {
     if (message) setFormMessage($('recoveryMessage'), message, type || 'error');
     setTimeout(() => { const el = $('recoveryCode'); if (el) el.focus(); }, 80);
   }
+  if (mode === 'connection') {
+    if (message) setFormMessage($('connectionMessage'), message, type || 'error');
+    setTimeout(() => { const el = $('retryConnection'); if (el) el.focus(); }, 80);
+  }
 }
 
 async function checkInitial() {
@@ -363,29 +384,32 @@ async function checkInitial() {
     showAuth('login', 'O endereço da API não foi configurado. Publique o backend e atualize o config.js.', 'error');
     return;
   }
+  // Com sessão salva, tenta abrir direto. Assim o F5 faz uma única chamada
+  // em vez de setupStatus + bootstrap em sequência.
+  if (state.token) {
+    try {
+      const data = await api('bootstrap', {});
+      enterApp(data);
+      return;
+    } catch (e) {
+      if (!isAuthError(e)) {
+        showConnectionError(e.message);
+        return;
+      }
+      saveToken('');
+      resetListCaches();
+      showAuth('login', e.message, 'error');
+      return;
+    }
+  }
   try {
     const st = await api('setupStatus', {}, { token: '' });
     state.setupStatus = st;
     if (st.precisaSetup) { showAuth('setup'); return; }
     if (st.configuracaoPendente) { showAuth('pending'); return; }
-    if (state.token) {
-      try {
-        const data = await api('bootstrap', {});
-        enterApp(data);
-        return;
-      } catch (e) {
-        if (e.code === 'NAO_AUTENTICADO' || e.code === 'SESSAO_EXPIRADA' || e.code === 'CONTA_BLOQUEADA') {
-          localStorage.removeItem(TOKEN_KEY); state.token = '';
-          showAuth('login', e.message, 'error');
-          return;
-        }
-        showAuth('login', e.message, 'error');
-        return;
-      }
-    }
     showAuth('login');
   } catch (e) {
-    showAuth('login', e.message || 'Não foi possível conectar ao servidor.', 'error');
+    showConnectionError(e.message || 'Não foi possível conectar ao servidor.');
   }
 }
 
@@ -402,6 +426,8 @@ function enterApp(data) {
   const view = VIEW_META[hash] ? hash : 'dashboard';
   setView(view, { push: false });
   renderCurrentView();
+  state.postLoadScheduled = false;
+  schedulePostLoad();
 }
 
 function saveToken(token) {
@@ -425,9 +451,15 @@ async function doLogin(e) {
     const data = await api('login', { email, senha, userAgent: navigator.userAgent }, { token: '', requestId: rid });
     form.dataset.requestId = '';
     saveToken(data.token);
-    const boot = await api('bootstrap', {});
-    enterApp(boot);
-    showToast(`Bem-vindo, ${firstName(data.usuario.nome)}.`, 'success');
+    resetListCaches();
+    try {
+      const boot = await api('bootstrap', {});
+      enterApp(boot);
+      showToast(`Bem-vindo, ${firstName(data.usuario.nome)}.`, 'success');
+    } catch (bootErr) {
+      if (isAuthError(bootErr)) throw bootErr;
+      showConnectionError(bootErr.message);
+    }
   } catch (err) {
     setFormMessage($('loginMessage'), err.message, 'error');
   } finally {
@@ -480,10 +512,16 @@ async function doSetup(e) {
     const data = await api('setupAdmin', { codigo, nome, email, senha, userAgent: navigator.userAgent }, { token: '', requestId: rid });
     form.dataset.requestId = '';
     saveToken(data.token);
-    const boot = await api('bootstrap', {});
-    enterApp(boot);
-    showToast('Administrador criado. A configuração inicial foi encerrada.', 'success');
-    if (data.avisos && data.avisos.length) setTimeout(() => showToast(data.avisos.join(' '), 'error'), 700);
+    resetListCaches();
+    try {
+      const boot = await api('bootstrap', {});
+      enterApp(boot);
+      showToast('Administrador criado. A configuração inicial foi encerrada.', 'success');
+      if (data.avisos && data.avisos.length) setTimeout(() => showToast(data.avisos.join(' '), 'error'), 700);
+    } catch (bootErr) {
+      if (isAuthError(bootErr)) throw bootErr;
+      showConnectionError(bootErr.message);
+    }
   } catch (err) {
     setFormMessage($('setupMessage'), err.message, 'error');
   } finally {
@@ -580,6 +618,7 @@ async function refreshData(opts) {
     state.data = data;
     state.user = data.usuario;
     updateChrome();
+    markListCachesStale();
     if (!opts.keepModal) renderCurrentView();
   } catch (e) {
     if (!opts.silent) showToast(e.message, 'error');
@@ -587,6 +626,119 @@ async function refreshData(opts) {
   } finally {
     if (btn) btn.classList.remove('spinning');
   }
+}
+
+/* ---------- Cache das telas e rotinas de segundo plano ---------- */
+function listCacheFor(key) {
+  if (key.indexOf('mov|') === 0) return state.movCache;
+  if (key.indexOf('man|') === 0) return state.manCache;
+  if (key.indexOf('audit|') === 0) return state.auditCache;
+  return null;
+}
+
+function getListCache(key) {
+  const cache = listCacheFor(key);
+  return cache ? cache[key] : null;
+}
+
+function setListCache(key, data) {
+  const cache = listCacheFor(key);
+  if (!cache) return;
+  cache[key] = { data: data, at: Date.now() };
+  const keys = Object.keys(cache);
+  if (keys.length > 24) {
+    keys.sort(function (a, b) { return (cache[a].at || 0) - (cache[b].at || 0); });
+    for (let i = 0; i < keys.length - 24; i++) delete cache[keys[i]];
+  }
+}
+
+function apiList(action, payload, key) {
+  if (state.listInflight[key]) return state.listInflight[key];
+  const promise = api(action, payload).then(function (data) {
+    setListCache(key, data);
+    return data;
+  }).finally(function () {
+    delete state.listInflight[key];
+  });
+  state.listInflight[key] = promise;
+  return promise;
+}
+
+function markListCachesStale() {
+  [state.movCache, state.manCache, state.auditCache].forEach(function (cache) {
+    Object.keys(cache).forEach(function (key) { cache[key].at = 0; });
+  });
+}
+
+function resetListCaches() {
+  state.movCache = {};
+  state.manCache = {};
+  state.auditCache = {};
+  state.listInflight = {};
+  state.movData = null;
+  state.manData = null;
+  state.auditData = null;
+}
+
+function movFiltersKey(page) {
+  const f = state.movFilters;
+  return ['mov', page, f.tipo, f.busca, f.dataInicio, f.dataFim].join('|');
+}
+
+function manFiltersKey() {
+  return ['man', state.manFilters.status, state.manFilters.busca].join('|');
+}
+
+function auditFiltersKey(page) {
+  return ['audit', page, state.auditBusca].join('|');
+}
+
+function schedulePostLoad() {
+  if (state.postLoadScheduled) return;
+  state.postLoadScheduled = true;
+  setTimeout(function () { runPostLoad().catch(function () {}); }, 1500);
+}
+
+async function runPostLoad() {
+  if (!state.token || !state.data) return;
+  // Aquece as telas mais usadas antes da sincronização pesada, para que a
+  // primeira navegação já encontre os dados em cache.
+  await prefetchCommonLists();
+  if (isAdmin() && state.data.precisaSincronizacao) await runInitialSync();
+}
+
+async function runInitialSync() {
+  if (state.syncRunning || !state.token) return;
+  state.syncRunning = true;
+  try {
+    const data = await api('sincronizarTudo', {}, { requestId: genId(), timeout: 180000 });
+    if (state.data) state.data.precisaSincronizacao = false;
+    await refreshData({ silent: true, keepModal: true });
+    if (data.erros && data.erros.length) {
+      showToast('Sincronização inicial: ' + data.erros.length + ' item(ns) com erro. Use Sincronizar planilha para conferir.', 'error');
+    }
+  } catch (e) {
+    if (!isAuthError(e)) showToast('A sincronização inicial das abas não foi concluída: ' + e.message, 'error');
+  } finally {
+    state.syncRunning = false;
+  }
+}
+
+function prefetchCommonLists() {
+  if (!state.token || !state.data || document.visibilityState === 'hidden') return Promise.resolve();
+  const mf = state.movFilters;
+  const tasks = [
+    apiList('listarMovimentacoes', {
+      page: 1, pageSize: 25, tipo: mf.tipo, busca: mf.busca, dataInicio: mf.dataInicio, dataFim: mf.dataFim
+    }, movFiltersKey(1)),
+    apiList('listarManutencoes', {
+      status: state.manFilters.status, busca: state.manFilters.busca
+    }, manFiltersKey())
+  ];
+  if (isAdmin()) {
+    tasks.push(apiList('listarAuditoria', { page: 1, pageSize: 30, busca: state.auditBusca }, auditFiltersKey(1)));
+  }
+  return Promise.allSettled(tasks);
 }
 
 function openSidebar() {
@@ -955,38 +1107,67 @@ function renderMovementsView() {
   loadMovements(state.movPage || 1);
 }
 
-async function loadMovements(page) {
+async function loadMovements(page, opts) {
+  opts = opts || {};
   state.movPage = page || 1;
-  state.movLoading = true;
+  const key = movFiltersKey(state.movPage);
+  const cached = getListCache(key);
   const el = $('movList');
-  if (el) el.innerHTML = `<div class="card"><div class="card-body">${skeletonRows(6)}</div></div>`;
+  if (cached) {
+    paintMovements(cached.data, el);
+    if (!opts.force && Date.now() - cached.at < 60000) return;
+  } else if (el) {
+    if (state.movData) paintMovements(state.movData, el);
+    else el.innerHTML = `<div class="card"><div class="card-body">${skeletonRows(6)}</div></div>`;
+  }
+  const req = ++state.movReq;
+  state.movLoading = true;
   try {
-    const data = await api('listarMovimentacoes', { page: state.movPage, pageSize: 25, tipo: state.movFilters.tipo, busca: state.movFilters.busca, dataInicio: state.movFilters.dataInicio, dataFim: state.movFilters.dataFim });
-    state.movData = data;
-    if (!el) return;
-    if (!data.items.length) { el.innerHTML = `<div class="card">${emptyState('history', 'Nenhuma movimentação', 'Ajuste os filtros ou registre a primeira entrega.')}</div>`; hydrateIcons(el); return; }
-    el.innerHTML = `
-      <div class="table-wrap desktop-only"><table class="data-table">
-        <thead><tr><th>Data</th><th>Tipo</th><th>Equipamento</th><th>Origem → destino</th><th>Qtd.</th><th>Usuário</th><th>Observações</th></tr></thead>
-        <tbody>${data.items.map((m) => `<tr>
-          <td class="nowrap">${esc(fmtDate(m.data))}</td>
-          <td><span class="type-chip ${movementTypeClass(m.tipo)}">${icon(movementIcon(m.tipo))} ${esc(TIPO_LABEL[m.tipo] || m.tipo)}</span></td>
-          <td><button type="button" class="link-btn" data-action="open-equipment" data-id="${esc(m.equipamentoId)}">${esc(m.equipamentoCodigo)}</button><span class="cell-sub">${esc(m.categoriaNome)}</span></td>
-          <td><span class="cell-main">${esc(m.colaboradorOrigemNome || 'Estoque')}</span> <span class="muted">→</span> <span class="cell-main">${esc(m.colaboradorDestinoNome || 'Estoque')}</span></td>
-          <td class="cell-qty">${fmtQty(m.quantidade)}</td>
-          <td>${esc(m.usuarioEmail || '—')}</td>
-          <td><span class="audit-detail">${esc(m.observacoes || '—')}</span></td>
-        </tr>`).join('')}</tbody>
-      </table></div>
-      <div class="mobile-cards">${data.items.map((m) => `<article class="eq-card"><div class="eq-card-head"><div><div class="eq-card-code">${esc(TIPO_LABEL[m.tipo] || m.tipo)} · ${esc(fmtDate(m.data))}</div><div class="eq-card-title">${esc(m.equipamentoCodigo)}</div><div class="eq-card-sub">${esc(m.colaboradorOrigemNome || 'Estoque')} → ${esc(m.colaboradorDestinoNome || 'Estoque')}</div></div><span class="badge">${fmtQty(m.quantidade)} un.</span></div>${m.observacoes ? `<p class="small muted mt-8">${esc(m.observacoes)}</p>` : ''}</article>`).join('')}</div>
-      <div class="table-foot"><span class="muted">${fmtQty(data.total)} movimentação(ões) · página ${data.page} de ${data.totalPaginas}</span><div class="pagination">
-        <button type="button" class="page-btn" data-action="mov-page" data-page="${data.page - 1}" ${data.page <= 1 ? 'disabled' : ''}>${icon('chevronLeft')}</button>
-        <button type="button" class="page-btn" data-action="mov-page" data-page="${data.page + 1}" ${data.page >= data.totalPaginas ? 'disabled' : ''}>${icon('chevronRight')}</button>
-      </div></div>`;
-    hydrateIcons(el);
+    const data = await apiList('listarMovimentacoes', {
+      page: state.movPage, pageSize: 25, tipo: state.movFilters.tipo, busca: state.movFilters.busca,
+      dataInicio: state.movFilters.dataInicio, dataFim: state.movFilters.dataFim
+    }, key);
+    if (req !== state.movReq || state.view !== 'movimentacoes' || key !== movFiltersKey(state.movPage)) return;
+    paintMovements(data);
   } catch (e) {
-    if (el) el.innerHTML = `<div class="card"><div class="card-body">${emptyState('alert', 'Não foi possível carregar', e.message)}</div></div>`;
-  } finally { state.movLoading = false; }
+    if (!cached && req === state.movReq && el) {
+      el.innerHTML = `<div class="card"><div class="card-body">${emptyState('alert', 'Não foi possível carregar', e.message)}</div></div>`;
+      hydrateIcons(el);
+    }
+  } finally {
+    if (req === state.movReq) state.movLoading = false;
+  }
+}
+
+function paintMovements(data, el) {
+  if (state.view !== 'movimentacoes' || !data) return;
+  el = el || $('movList');
+  if (!el) return;
+  state.movData = data;
+  if (!data.items.length) {
+    el.innerHTML = `<div class="card">${emptyState('history', 'Nenhuma movimentação', 'Ajuste os filtros ou registre a primeira entrega.')}</div>`;
+    hydrateIcons(el);
+    return;
+  }
+  el.innerHTML = `
+    <div class="table-wrap desktop-only"><table class="data-table">
+      <thead><tr><th>Data</th><th>Tipo</th><th>Equipamento</th><th>Origem → destino</th><th>Qtd.</th><th>Usuário</th><th>Observações</th></tr></thead>
+      <tbody>${data.items.map((m) => `<tr>
+        <td class="nowrap">${esc(fmtDate(m.data))}</td>
+        <td><span class="type-chip ${movementTypeClass(m.tipo)}">${icon(movementIcon(m.tipo))} ${esc(TIPO_LABEL[m.tipo] || m.tipo)}</span></td>
+        <td><button type="button" class="link-btn" data-action="open-equipment" data-id="${esc(m.equipamentoId)}">${esc(m.equipamentoCodigo)}</button><span class="cell-sub">${esc(m.categoriaNome)}</span></td>
+        <td><span class="cell-main">${esc(m.colaboradorOrigemNome || 'Estoque')}</span> <span class="muted">→</span> <span class="cell-main">${esc(m.colaboradorDestinoNome || 'Estoque')}</span></td>
+        <td class="cell-qty">${fmtQty(m.quantidade)}</td>
+        <td>${esc(m.usuarioEmail || '—')}</td>
+        <td><span class="audit-detail">${esc(m.observacoes || '—')}</span></td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+    <div class="mobile-cards">${data.items.map((m) => `<article class="eq-card"><div class="eq-card-head"><div><div class="eq-card-code">${esc(TIPO_LABEL[m.tipo] || m.tipo)} · ${esc(fmtDate(m.data))}</div><div class="eq-card-title">${esc(m.equipamentoCodigo)}</div><div class="eq-card-sub">${esc(m.colaboradorOrigemNome || 'Estoque')} → ${esc(m.colaboradorDestinoNome || 'Estoque')}</div></div><span class="badge">${fmtQty(m.quantidade)} un.</span></div>${m.observacoes ? `<p class="small muted mt-8">${esc(m.observacoes)}</p>` : ''}</article>`).join('')}</div>
+    <div class="table-foot"><span class="muted">${fmtQty(data.total)} movimentação(ões) · página ${data.page} de ${data.totalPaginas}</span><div class="pagination">
+      <button type="button" class="page-btn" data-action="mov-page" data-page="${data.page - 1}" ${data.page <= 1 ? 'disabled' : ''}>${icon('chevronLeft')}</button>
+      <button type="button" class="page-btn" data-action="mov-page" data-page="${data.page + 1}" ${data.page >= data.totalPaginas ? 'disabled' : ''}>${icon('chevronRight')}</button>
+    </div></div>`;
+  hydrateIcons(el);
 }
 
 /* ---------- Manutenções ---------- */
@@ -1010,21 +1191,49 @@ function renderMaintenanceView() {
   loadMaintenances();
 }
 
-async function loadMaintenances() {
-  state.manLoading = true;
+async function loadMaintenances(opts) {
+  opts = opts || {};
+  const key = manFiltersKey();
+  const cached = getListCache(key);
   const el = $('manList');
-  if (el) el.innerHTML = `<div class="card"><div class="card-body">${skeletonRows(4)}</div></div>`;
+  if (cached) {
+    paintMaintenances(cached.data, el);
+    if (!opts.force && Date.now() - cached.at < 60000) return;
+  } else if (el) {
+    if (state.manData) paintMaintenances(state.manData, el);
+    else el.innerHTML = `<div class="card"><div class="card-body">${skeletonRows(4)}</div></div>`;
+  }
+  const req = ++state.manReq;
+  state.manLoading = true;
   try {
-    const data = await api('listarManutencoes', { status: state.manFilters.status, busca: state.manFilters.busca });
-    state.manData = data;
-    const count = $('manCount'); if (count) count.innerHTML = `<strong>${fmtQty(data.total)}</strong> registro(s)`;
-    if (!el) return;
-    if (!data.items.length) { el.innerHTML = `<div class="card">${emptyState('wrench', 'Nenhuma manutenção encontrada', 'Ajuste os filtros ou envie um equipamento para manutenção.')}</div>`; hydrateIcons(el); return; }
-    el.innerHTML = `<div class="entity-grid">${data.items.map(manCard).join('')}</div>`;
-    hydrateIcons(el);
+    const data = await apiList('listarManutencoes', {
+      status: state.manFilters.status, busca: state.manFilters.busca
+    }, key);
+    if (req !== state.manReq || state.view !== 'manutencoes' || key !== manFiltersKey()) return;
+    paintMaintenances(data);
   } catch (e) {
-    if (el) el.innerHTML = `<div class="card"><div class="card-body">${emptyState('alert', 'Não foi possível carregar', e.message)}</div></div>`;
-  } finally { state.manLoading = false; }
+    if (!cached && req === state.manReq && el) {
+      el.innerHTML = `<div class="card"><div class="card-body">${emptyState('alert', 'Não foi possível carregar', e.message)}</div></div>`;
+      hydrateIcons(el);
+    }
+  } finally {
+    if (req === state.manReq) state.manLoading = false;
+  }
+}
+
+function paintMaintenances(data, el) {
+  if (state.view !== 'manutencoes' || !data) return;
+  el = el || $('manList');
+  if (!el) return;
+  state.manData = data;
+  const count = $('manCount'); if (count) count.innerHTML = `<strong>${fmtQty(data.total)}</strong> registro(s)`;
+  if (!data.items.length) {
+    el.innerHTML = `<div class="card">${emptyState('wrench', 'Nenhuma manutenção encontrada', 'Ajuste os filtros ou envie um equipamento para manutenção.')}</div>`;
+    hydrateIcons(el);
+    return;
+  }
+  el.innerHTML = `<div class="entity-grid">${data.items.map(manCard).join('')}</div>`;
+  hydrateIcons(el);
 }
 
 function manCard(m) {
@@ -1162,25 +1371,54 @@ function renderAuditView() {
   loadAudit(state.auditPage || 1);
 }
 
-async function loadAudit(page) {
+async function loadAudit(page, opts) {
+  opts = opts || {};
   state.auditPage = page || 1;
-  state.auditLoading = true;
+  if (!isAdmin()) return;
+  const key = auditFiltersKey(state.auditPage);
+  const cached = getListCache(key);
   const el = $('auditList');
-  if (el) el.innerHTML = `<div class="card"><div class="card-body">${skeletonRows(6)}</div></div>`;
+  if (cached) {
+    paintAudit(cached.data, el);
+    if (!opts.force && Date.now() - cached.at < 60000) return;
+  } else if (el) {
+    if (state.auditData) paintAudit(state.auditData, el);
+    else el.innerHTML = `<div class="card"><div class="card-body">${skeletonRows(6)}</div></div>`;
+  }
+  const req = ++state.auditReq;
+  state.auditLoading = true;
   try {
-    const data = await api('listarAuditoria', { page: state.auditPage, pageSize: 30, busca: state.auditBusca });
-    state.auditData = data;
-    const count = $('auditCount'); if (count) count.innerHTML = `<strong>${fmtQty(data.total)}</strong> registro(s)`;
-    if (!el) return;
-    if (!data.items.length) { el.innerHTML = `<div class="card">${emptyState('history', 'Nenhum registro', 'As ações administrativas aparecerão aqui.')}</div>`; hydrateIcons(el); return; }
-    el.innerHTML = `<div class="table-wrap"><table class="data-table"><thead><tr><th>Data</th><th>Usuário</th><th>Ação</th><th>Entidade</th><th>Detalhes</th><th>Origem</th></tr></thead><tbody>
-      ${data.items.map((a) => `<tr><td class="nowrap">${esc(fmtDateTime(a.DATA))}</td><td><span class="cell-main">${esc(a.USUARIO_EMAIL || '—')}</span><span class="cell-sub">${esc(a.PERFIL || '')}</span></td><td><span class="badge">${esc(a.ACAO)}</span></td><td>${esc(a.ENTIDADE)}<span class="cell-sub">${esc(a.ENTIDADE_ID || '')}</span></td><td><span class="audit-detail">${esc(a.DETALHES || '—')}</span></td><td>${esc(a.ORIGEM || 'APP')}</td></tr>`).join('')}
-    </tbody></table></div>
-    <div class="table-foot"><span class="muted">${fmtQty(data.total)} registro(s) · página ${data.page} de ${data.totalPaginas}</span><div class="pagination"><button type="button" class="page-btn" data-action="audit-page" data-page="${data.page - 1}" ${data.page <= 1 ? 'disabled' : ''}>${icon('chevronLeft')}</button><button type="button" class="page-btn" data-action="audit-page" data-page="${data.page + 1}" ${data.page >= data.totalPaginas ? 'disabled' : ''}>${icon('chevronRight')}</button></div></div>`;
-    hydrateIcons(el);
+    const data = await apiList('listarAuditoria', {
+      page: state.auditPage, pageSize: 30, busca: state.auditBusca
+    }, key);
+    if (req !== state.auditReq || state.view !== 'auditoria' || key !== auditFiltersKey(state.auditPage)) return;
+    paintAudit(data);
   } catch (e) {
-    if (el) el.innerHTML = `<div class="card"><div class="card-body">${emptyState('alert', 'Não foi possível carregar', e.message)}</div></div>`;
-  } finally { state.auditLoading = false; }
+    if (!cached && req === state.auditReq && el) {
+      el.innerHTML = `<div class="card"><div class="card-body">${emptyState('alert', 'Não foi possível carregar', e.message)}</div></div>`;
+      hydrateIcons(el);
+    }
+  } finally {
+    if (req === state.auditReq) state.auditLoading = false;
+  }
+}
+
+function paintAudit(data, el) {
+  if (state.view !== 'auditoria' || !data) return;
+  el = el || $('auditList');
+  if (!el) return;
+  state.auditData = data;
+  const count = $('auditCount'); if (count) count.innerHTML = `<strong>${fmtQty(data.total)}</strong> registro(s)`;
+  if (!data.items.length) {
+    el.innerHTML = `<div class="card">${emptyState('history', 'Nenhum registro', 'As ações administrativas aparecerão aqui.')}</div>`;
+    hydrateIcons(el);
+    return;
+  }
+  el.innerHTML = `<div class="table-wrap"><table class="data-table"><thead><tr><th>Data</th><th>Usuário</th><th>Ação</th><th>Entidade</th><th>Detalhes</th><th>Origem</th></tr></thead><tbody>
+    ${data.items.map((a) => `<tr><td class="nowrap">${esc(fmtDateTime(a.DATA))}</td><td><span class="cell-main">${esc(a.USUARIO_EMAIL || '—')}</span><span class="cell-sub">${esc(a.PERFIL || '')}</span></td><td><span class="badge">${esc(a.ACAO)}</span></td><td>${esc(a.ENTIDADE)}<span class="cell-sub">${esc(a.ENTIDADE_ID || '')}</span></td><td><span class="audit-detail">${esc(a.DETALHES || '—')}</span></td><td>${esc(a.ORIGEM || 'APP')}</td></tr>`).join('')}
+  </tbody></table></div>
+  <div class="table-foot"><span class="muted">${fmtQty(data.total)} registro(s) · página ${data.page} de ${data.totalPaginas}</span><div class="pagination"><button type="button" class="page-btn" data-action="audit-page" data-page="${data.page - 1}" ${data.page <= 1 ? 'disabled' : ''}>${icon('chevronLeft')}</button><button type="button" class="page-btn" data-action="audit-page" data-page="${data.page + 1}" ${data.page >= data.totalPaginas ? 'disabled' : ''}>${icon('chevronRight')}</button></div></div>`;
+  hydrateIcons(el);
 }
 
 function skeletonRows(n) {
@@ -1409,12 +1647,15 @@ async function afterWrite(message, opts) {
 
 async function doSyncSheet(btn) {
   if (!btn || btn.disabled) return;
+  if (state.syncRunning) { showToast('A sincronização já está em andamento.', 'info'); return; }
   let rid = btn.dataset.requestId;
   if (!rid) { rid = genId(); btn.dataset.requestId = rid; }
+  state.syncRunning = true;
   setButtonBusy(btn, true);
   try {
-    const data = await api('sincronizarTudo', {}, { requestId: rid });
+    const data = await api('sincronizarTudo', {}, { requestId: rid, timeout: 180000 });
     delete btn.dataset.requestId;
+    if (state.data) state.data.precisaSincronizacao = false;
     await refreshData({ silent: true, keepModal: true });
     renderCurrentView();
     openSyncReport(data);
@@ -1422,6 +1663,7 @@ async function doSyncSheet(btn) {
   } catch (e) {
     showToast(e.message, 'error');
   } finally {
+    state.syncRunning = false;
     setButtonBusy(btn, false);
   }
 }
@@ -2253,8 +2495,11 @@ async function doLogout() {
   closeSidebar();
   try { await api('logout', {}, { requestId: genId() }); } catch (e) {}
   saveToken('');
+  resetListCaches();
   state.data = null;
   state.user = null;
+  state.syncRunning = false;
+  state.postLoadScheduled = false;
   closeDetail();
   closeModal();
   hideApp();
@@ -2271,6 +2516,8 @@ function bindStaticEvents() {
   $('showRecovery').addEventListener('click', () => showAuth('recovery'));
   $('backToLogin').addEventListener('click', () => showAuth('login'));
   $('retrySetupStatus').addEventListener('click', checkInitial);
+  $('retryConnection').addEventListener('click', checkInitial);
+  $('connectionLogout').addEventListener('click', () => { saveToken(''); resetListCaches(); showAuth('login'); });
   $('helpBtn').addEventListener('click', () => openHelp());
   $('authInstallBtn').addEventListener('click', async () => {
     if (state.deferredPrompt) {
@@ -2314,9 +2561,9 @@ function bindStaticEvents() {
   window.addEventListener('online', () => { $('offlineBanner').classList.add('hidden'); showToast('Conexão restabelecida.', 'success'); });
   window.addEventListener('offline', () => { $('offlineBanner').classList.remove('hidden'); });
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && state.data && state.token && !$('modalRoot').innerHTML) {
+    if (document.visibilityState === 'visible' && state.data && state.token && !state.syncRunning && !$('modalRoot').innerHTML) {
       const last = state.data.atualizadoEm ? new Date(state.data.atualizadoEm.replace(' ', 'T')).getTime() : 0;
-      if (!last || Date.now() - last > 60000) refreshData({ silent: true }).catch(() => {});
+      if (!last || Date.now() - last > 300000) refreshData({ silent: true }).catch(() => {});
     }
   });
 }

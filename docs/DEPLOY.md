@@ -66,7 +66,7 @@ Se o código for perdido **antes** do primeiro administrador:
 4. O código aparece no log de execução.
 5. Use-o na tela de setup.
 
-O setup executa a sincronização inicial das abas originais. Em uma base com 50 equipamentos, a versão em lote leva cerca de 30 segundos; o frontend aguarda até 120 segundos antes de mostrar erro.
+O setup cria o administrador e abre o painel sem esperar a sincronização das abas originais. Em uma base com 50 equipamentos, a sincronização em lote leva cerca de 30 segundos e roda em segundo plano; o frontend aguarda até 120 segundos nas demais chamadas antes de mostrar erro.
 
 ### 3.1 Sincronização das abas originais
 
@@ -81,7 +81,7 @@ O backend atualiza a aba original da categoria depois de cada operação autoriz
 
 O histórico completo fica nas abas `EMPRESTIMOS`, `MOVIMENTACOES` e `MANUTENCOES`. O nome do responsável anterior não é apagado do histórico; apenas sai do campo de posse atual.
 
-A primeira abertura do administrador após uma atualização executa a sincronização inicial (`SINCRONIZACAO_INICIAL=OK`). Também é possível executar:
+A primeira abertura do administrador após uma atualização agenda a sincronização inicial em segundo plano, depois que o painel já está visível. O indicador `SINCRONIZACAO_INICIAL=OK` é gravado quando ela termina. Também é possível executar:
 
 - botão **Sincronizar planilha** no painel;
 - função `sincronizarPlanilhaEditor()` no editor do Apps Script.
@@ -266,8 +266,8 @@ O importador foi usado uma única vez na produção. O resultado está documenta
 
 - A planilha deve continuar privada. Não compartilhe com colaboradores para “dar acesso ao app”.
 - O acesso é por e-mail/senha no aplicativo.
-- O token de sessão fica no `localStorage`; o servidor guarda somente o hash.
-- Sessão de 12 horas.
+- O token de sessão fica no `localStorage`; o servidor guarda somente o hash. Falhas temporárias de conexão não apagam o token: o app mostra **Tentar novamente** e mantém a sessão.
+- Sessão de 10 anos; só termina no logout, bloqueio do usuário ou troca de perfil. O F5 mantém a sessão.
 - 5 tentativas de login erradas → bloqueio de 15 minutos.
 - 10 tentativas de setup erradas → bloqueio de 15 minutos.
 - A senha é hash SHA-256 iterado 1.500 vezes com sal aleatório.
@@ -322,7 +322,7 @@ Não exclua a planilha original nem o Excel de origem.
 | “Estrutura ausente” | Abas auxiliares não criadas | Rode o importador ou `testarEstrutura`. |
 | “A planilha não foi encontrada” | `SPREADSHEET_ID` errado ou planilha sem acesso | Confira o ID e a conta que executa o script. |
 | Setup não aparece | Já existe administrador ou hash de setup apagado | Use a recuperação ou gere novo código com `gerarCodigoSetup` (somente sem admin). |
-| “Sessão expirada” | 12 horas de validade | Entre novamente. |
+| “Sessão expirada” | Sessão revogada, conta bloqueada ou mais de 10 anos sem uso | Entre novamente. |
 | App antigo no celular | Cache do service worker | Toque em **Recarregar** no aviso de nova versão ou limpe o cache do site. |
 | iPhone não instala | Navegador diferente do Safari | Abra no Safari e use **Adicionar à Tela de Início**. |
 

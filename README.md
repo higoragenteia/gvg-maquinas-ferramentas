@@ -100,7 +100,7 @@ O histórico completo permanece em `EMPRESTIMOS` e `MOVIMENTACOES`. Editar uma a
 ## Segurança
 
 - Senhas armazenadas apenas como hash SHA-256 iterado com sal (1.500 iterações). Nunca em texto puro.
-- Token de sessão aleatório; somente o hash do token é gravado na planilha. Expiração de 12 horas.
+- Token de sessão aleatório; somente o hash do token é gravado na planilha. A sessão dura 10 anos e só é encerrada ao clicar em **Sair**, ao bloquear o usuário ou ao trocar o perfil. O F5 mantém a sessão.
 - Bloqueio após 5 tentativas de login por 15 minutos.
 - Código de setup e código de recuperação armazenados apenas como hash no `CONFIG`; o código em si não fica na planilha.
 - Permissões conferidas no servidor em **todas** as operações.
@@ -130,5 +130,5 @@ O histórico completo permanece em `EMPRESTIMOS` e `MOVIMENTACOES`. Editar uma a
 - Planilha de produção estruturada e com administrador configurado.
 - Sincronização das abas originais implementada e testada em cópia.
 - Testes de integração real feitos em uma cópia de teste, não na produção.
-- O primeiro carregamento do administrador após a atualização executa a sincronização inicial das abas originais.
+- O primeiro carregamento do administrador após a atualização executa a sincronização inicial das abas originais em segundo plano, sem bloquear a abertura do painel. O botão **Sincronizar planilha** continua disponível.
 - Instalação em aparelhos Android/iPhone físicos ainda depende de teste do proprietário.

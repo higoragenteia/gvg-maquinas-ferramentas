@@ -919,3 +919,9 @@ body.sidebar-open .toast-root { display: none; }
 }
 
 .nav-badge.gold { color: #2c2108; background: rgba(200,162,74,.28); border-color: rgba(228,200,122,.35); }
+
+
+/* Sessão mantida em falhas temporárias de conexão */
+#connectionBox .auth-card-head { margin-bottom: 14px; }
+#connectionBox .btn + .btn { margin-top: 8px; }
+#connectionBox .form-message:empty { display: none; }

@@ -1,7 +1,7 @@
 /* GVG & ARTEFAL — PWA Controle de Máquinas e Ferramentas
    O service worker guarda apenas a interface (HTML, CSS, JS e ícones).
    As respostas da API nunca são colocadas em cache. */
-const CACHE = 'gvg-maquinas-v4';
+const CACHE = 'gvg-maquinas-v5';
 const SHELL = [
   './',
   './index.html',

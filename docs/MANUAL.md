@@ -159,7 +159,7 @@ No iPhone, use o Safari; outros navegadores podem não instalar o PWA da mesma f
 
 ## 13. Atualização dos dados
 
-- O aplicativo lê os dados ao abrir e ao tocar em **Atualizar**.
+- O aplicativo lê os dados ao abrir e ao tocar em **Atualizar**. O F5 mantém a sessão; se a internet falhar, aparece **Tentar novamente** sem pedir a senha de novo.
 - Alterações feitas diretamente nas abas do sistema aparecem ao recarregar.
 - As abas originais são espelhadas pelo aplicativo. Se você editá-las manualmente, a próxima sincronização pode sobrescrever o estado atual.
 - Use **Sincronizar planilha** para conferir e reparar as abas originais.
@@ -175,7 +175,7 @@ No iPhone, use o Safari; outros navegadores podem não instalar o PWA da mesma f
 | **Equipamento em uso** | Registre a devolução (inclusive acessórios pendentes) antes de inativar ou enviar para manutenção. |
 | **Equipamento com histórico** | Use **Inativar**; a exclusão definitiva preserva o histórico. |
 | **Último administrador ativo** | Crie/promova outro administrador antes de rebaixar ou bloquear este. |
-| **Sessão expirada** | Entre novamente. A sessão dura 12 horas. |
+| **Sessão expirada** | Entre novamente. A sessão só termina ao clicar em **Sair**, ao ter a conta bloqueada ou após 10 anos. O F5 mantém a sessão. |
 | **Muitas tentativas** | Aguarde 15 minutos. |
 | **Acesso negado / Authorization needed** | A autorização inicial do Apps Script precisa ser feita pelo proprietário. Veja `DEPLOY.md`. |
 

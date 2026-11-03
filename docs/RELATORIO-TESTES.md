@@ -205,6 +205,22 @@ Testes executados em cópia de teste com backend real e frontend de teste:
 
 A produção já possui administrador criado pelo proprietário. A sincronização inicial das abas originais da produção é executada automaticamente na primeira abertura do administrador após esta atualização; não foi criada uma sessão de teste na produção.
 
-## 12. Conclusão
+## 12. Sessão persistente e navegação rápida (03/11/2026)
 
-O que foi implementado e testado está funcional no ambiente real de teste. A produção foi estruturada com os dados importados e está pronta para o primeiro administrador, sem dados de teste. As pendências reais são a criação do administrador de produção pelo proprietário e a confirmação de instalação nos aparelhos físicos Android/iPhone.
+Testes executados em cópia de teste com backend real:
+
+- Sessão criada com validade de **10 anos** (`EXPIRA_EM` em 2036), sem expiração em 12 horas.
+- Setup do administrador concluído em **10,8 segundos**, sem executar a sincronização das abas no caminho crítico; a sincronização iniciou em segundo plano e terminou com `SINCRONIZACAO_INICIAL=OK`.
+- F5 com token salvo: o painel abriu direto, sem passar pela tela de login e sem apagar o token.
+- Falha temporária simulada no bootstrap durante o F5: apareceu a tela **Não foi possível carregar** com **Tentar novamente**, o token permaneceu salvo e o login não foi exibido.
+- **Tentar novamente** reabriu o painel sem pedir senha.
+- Logout removeu o token e voltou para o login.
+- Navegação com cache em memória: movimentações **130 ms**, manutenções **75 ms**, auditoria **85 ms**; segunda rodada **91 ms**, **58 ms** e **69 ms**. No celular, movimentações em **179 ms**.
+- F5 no celular manteve a sessão e o painel abriu normalmente.
+- Nenhum erro de console no desktop ou no celular, exceto o erro esperado da falha de rede simulada.
+
+A sincronização inicial da produção já estava concluída antes desta alteração. As sessões ativas de produção foram estendidas para 10 anos para que os usuários atuais não sejam desconectados.
+
+## 13. Conclusão
+
+O que foi implementado e testado está funcional no ambiente real de teste e publicado na produção. A produção tem administrador configurado, sincronização das abas originais concluída e sessões ativas estendidas. As pendências reais são a confirmação de instalação/abertura nos aparelhos físicos Android/iPhone e o teste do proprietário no ambiente publicado.

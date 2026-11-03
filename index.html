@@ -184,6 +184,17 @@
           </div>
           <button type="button" class="btn btn-primary btn-block" id="retrySetupStatus">Verificar novamente</button>
         </div>
+
+        <div id="connectionBox" class="hidden">
+          <div class="auth-card-head">
+            <div class="auth-kicker">Conexão instável</div>
+            <h2>Não foi possível carregar</h2>
+            <p>Se você já estava conectado, sua sessão foi mantida. Verifique a internet e tente novamente; não é preciso digitar a senha de novo.</p>
+          </div>
+          <div id="connectionMessage" class="form-message" role="status" aria-live="polite"></div>
+          <button type="button" class="btn btn-primary btn-lg btn-block" id="retryConnection">Tentar novamente</button>
+          <button type="button" class="btn btn-ghost btn-block" id="connectionLogout">Entrar com outra conta</button>
+        </div>
       </div>
       <div class="auth-foot">GVG &amp; ARTEFAL · Controle de Máquinas e Ferramentas · Acesso protegido</div>
     </div>

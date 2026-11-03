@@ -371,23 +371,9 @@ function dashboardData(session) {
     atualizadoEm: nowStamp()
   };
   if (session.perfil === PERFIL.ADMIN) {
-    try {
-      if (configGet('SINCRONIZACAO_INICIAL') !== 'OK') {
-        const lock = LockService.getScriptLock();
-        if (lock.tryLock(5000)) {
-          try {
-            const sync = sincronizarTudoInterno(session, 'BOOTSTRAP-SYNC-' + Date.now());
-            if (sync.erros && sync.erros.length) {
-              data.avisos.push({ tipo: 'SINCRONIZACAO', titulo: 'Sincronização inicial', texto: sync.erros.length + ' item(ns) não puderam ser sincronizados com as abas originais. Use Sincronizar planilha.' });
-            }
-          } finally {
-            try { lock.releaseLock(); } catch (e2) {}
-          }
-        }
-      }
-    } catch (e) {
-      data.avisos.push({ tipo: 'SINCRONIZACAO', titulo: 'Sincronização inicial', texto: 'A sincronização automática falhou: ' + e.message + ' Use Sincronizar planilha.' });
-    }
+    // A sincronização inicial não bloqueia mais a abertura do app.
+    // O frontend a executa em segundo plano depois que o painel já está visível.
+    data.precisaSincronizacao = configGet('SINCRONIZACAO_INICIAL') !== 'OK';
     data.usuarios = lerTodosUsuarios().map(usuarioPublico).sort(function (a, b) { return String(a.nome).localeCompare(String(b.nome), 'pt-BR'); });
   }
   return data;
