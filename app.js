@@ -43,6 +43,7 @@ const state = {
   listInflight: {},
   syncRunning: false,
   postLoadScheduled: false,
+  prefetchPromise: null,
   colabSearch: '',
   usersCollapsed: localStorage.getItem(USERS_COLLAPSED_KEY) === '1',
   deferredPrompt: null,
@@ -427,6 +428,8 @@ function enterApp(data) {
   setView(view, { push: false });
   renderCurrentView();
   state.postLoadScheduled = false;
+  // Começa a aquecer as telas assim que o painel aparece, sem esperar 1,5 s.
+  state.prefetchPromise = prefetchCommonLists();
   schedulePostLoad();
 }
 
@@ -675,6 +678,7 @@ function resetListCaches() {
   state.manCache = {};
   state.auditCache = {};
   state.listInflight = {};
+  state.prefetchPromise = null;
   state.movData = null;
   state.manData = null;
   state.auditData = null;
@@ -701,9 +705,7 @@ function schedulePostLoad() {
 
 async function runPostLoad() {
   if (!state.token || !state.data) return;
-  // Aquece as telas mais usadas antes da sincronização pesada, para que a
-  // primeira navegação já encontre os dados em cache.
-  await prefetchCommonLists();
+  if (state.prefetchPromise) { try { await state.prefetchPromise; } catch (e) {} }
   if (isAdmin() && state.data.precisaSincronizacao) await runInitialSync();
 }
 
@@ -2500,6 +2502,7 @@ async function doLogout() {
   state.user = null;
   state.syncRunning = false;
   state.postLoadScheduled = false;
+  state.prefetchPromise = null;
   closeDetail();
   closeModal();
   hideApp();
