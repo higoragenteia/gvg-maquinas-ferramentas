@@ -561,15 +561,24 @@ async function doRecovery(e) {
 }
 
 /* ---------- Chrome / navegação ---------- */
+function profileAvatarContent(user) {
+  const email = String(user.email || '').trim().toLowerCase();
+  const name = String(user.nome || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+  const isHigor = email === 'higorjose.gvgesquadrias@gmail.com' ||
+    (!email && ['higor jose', 'higor jose de andrade do nascimento'].includes(name));
+  const template = $('higorProfileAvatar');
+  return isHigor && template ? template.innerHTML : esc(initials(user.nome));
+}
+
 function updateChrome() {
   if (!state.user || !state.data) return;
   const admin = isAdmin();
   document.querySelectorAll('.admin-only').forEach((el) => el.classList.toggle('hidden', !admin));
   $('userName').textContent = state.user.nome || '—';
   $('userRole').textContent = roleLabel(state.user.perfil);
-  $('userAvatar').textContent = initials(state.user.nome);
+  $('userAvatar').innerHTML = profileAvatarContent(state.user);
   $('topbarName').textContent = state.user.nome || '—';
-  $('topbarAvatar').textContent = initials(state.user.nome);
+  $('topbarAvatar').innerHTML = profileAvatarContent(state.user);
   $('navEqBadge').textContent = String(state.data.stats ? state.data.stats.totalEquipamentos : '') || '';
   $('navManBadge').textContent = String((state.data.manutencoesAbertas || []).length || '') || '';
   const pendentes = (state.data.usuarios || []).filter((u) => u.status === 'PENDENTE').length;
@@ -1348,7 +1357,7 @@ function userRow(u) {
     ? '<span class="badge pending">Pendente</span>'
     : `<span class="badge ${u.status === 'ATIVO' ? 'green' : 'red'}">${u.status === 'ATIVO' ? 'Ativo' : 'Bloqueado'}</span>`;
   return `<div class="user-row">
-    <span class="avatar">${esc(initials(u.nome))}</span>
+    <span class="avatar">${profileAvatarContent(u)}</span>
     <div class="user-row-info"><strong>${esc(u.nome)}${self ? ' <span class="badge gray" style="font-size:9px;padding:2px 5px">você</span>' : ''}</strong><span>${esc(u.email)} · ${esc(roleLabel(u.perfil))}${u.ultimoAcesso ? ' · último acesso ' + esc(fmtDateTime(u.ultimoAcesso)) : ''}</span></div>
     ${statusBadge}
     <div class="user-row-actions">
