@@ -925,3 +925,192 @@ body.sidebar-open .toast-root { display: none; }
 #connectionBox .auth-card-head { margin-bottom: 14px; }
 #connectionBox .btn + .btn { margin-top: 8px; }
 #connectionBox .form-message:empty { display: none; }
+
+/* === GVG Controle de Máquinas | Tema Ônix Violeta (somente cores) === */
+/* Referência: grafite escuro, detalhes violeta e painéis de baixo ruído visual.
+   Apenas CSS: navegação, textos, dados, permissões e funções permanecem intactos. */
+:root {
+  --navy: #F3EEFA;
+  --navy-2: #292233;
+  --navy-3: #49355D;
+  --blue: #AE67ED;
+  --blue-2: #C68EF6;
+  --blue-3: #3B2C50;
+  --gold: #A855EB;
+  --gold-2: #CE9BFB;
+  --gold-3: #3A294C;
+  --bg: #15131C;
+  --bg-2: #1E1B28;
+  --surface: #292633;
+  --surface-2: #342F42;
+  --text: #F5F1FA;
+  --text-2: #DDD7E8;
+  --muted: #AEA6BC;
+  --muted-2: #968CA6;
+  --line: #453D52;
+  --line-2: #5B506A;
+  --green: #71E2A6;
+  --green-bg: #20382F;
+  --amber: #F4C866;
+  --amber-bg: #413424;
+  --red: #FF909B;
+  --red-bg: #472C36;
+  --gray: #B3ADBF;
+  --gray-bg: #35313E;
+  --violet: #CCA4FD;
+  --violet-bg: #3A2B4E;
+  --shadow: 0 22px 50px -30px rgba(0,0,0,.70), 0 5px 20px -8px rgba(0,0,0,.38);
+  --shadow-sm: 0 10px 25px -18px rgba(0,0,0,.66), 0 2px 8px rgba(0,0,0,.22);
+  --shadow-lg: 0 35px 80px -35px rgba(0,0,0,.80), 0 8px 24px -12px rgba(0,0,0,.43);
+}
+html { color-scheme: dark; }
+body {
+  background:
+    radial-gradient(900px 460px at 80% -6%, rgba(124,61,173,.105), transparent 66%),
+    radial-gradient(820px 500px at 0% 70%, rgba(90,49,127,.08), transparent 65%),
+    var(--bg);
+}
+::selection { background: rgba(169,85,235,.35); }
+* { scrollbar-color: #4B3A63 transparent; }
+*::-webkit-scrollbar-thumb { background:#4B3A63; }
+*::-webkit-scrollbar-thumb:hover { background:#654A83; }
+
+.boot-screen, .auth-brand {
+  background:
+    radial-gradient(680px 450px at 10% 0%, rgba(169,85,235,.20), transparent 70%),
+    linear-gradient(155deg, #121019, #21172F 52%, #15121F);
+}
+.boot-mark, .brand-mark {
+  background: linear-gradient(145deg,#38234F,#191421);
+  border-color: rgba(195,129,245,.55);
+}
+.auth-brand::after { border-color:rgba(173,94,230,.20); box-shadow:0 0 0 60px rgba(173,94,230,.035),0 0 0 120px rgba(173,94,230,.018); }
+.auth-panel { background:linear-gradient(180deg,#1C1925,#15131C); }
+.auth-card, .modal-card { background:var(--surface); border-color:var(--line); }
+.auth-3d-card { background:linear-gradient(160deg,#373041,#292536); border-color:#5A4967; color:var(--text); }
+.auth-3d-box { background:linear-gradient(140deg,#42364D,#302A3C);border-color:#594762;box-shadow:none; }
+.auth-3d-box:nth-child(2) { background:linear-gradient(140deg,#4A325E,#34273F);border-color:#68427D; }
+.auth-3d-box:nth-child(3) { background:linear-gradient(140deg,#2F443E,#263530);border-color:#466358; }
+.auth-3d-line, .auth-3d-pill { background:#54475E; }
+.auth-3d-drill { background:linear-gradient(145deg,#C49AF0,#8C46CA);color:#1E1429; }
+.auth-note { color:#E7C5FF; border-color:#624A77; }
+.auth-signup { background:linear-gradient(180deg,#332C41,#292432); }
+.auth-install { background:#322D3D; }
+.auth-install:hover { background:#3E354B;border-color:var(--blue); }
+
+/* Barra lateral original, com a engrenagem SOMENTE decorativa no rodapé. */
+.sidebar {
+  overflow:hidden;
+  background:
+    radial-gradient(420px 280px at 0% 94%,rgba(105,47,164,.20),transparent 72%),
+    linear-gradient(165deg,#1C1927 0%,#1A1724 52%,#20172B 100%);
+  border-right-color:#40354E;
+}
+.sidebar::before {
+  content:"";
+  position:absolute;
+  left:-64px;bottom:-70px;
+  width:223px;height:223px;
+  background:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20240%20240%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22metal%22%20x1%3D%220%22%20x2%3D%221%22%20y1%3D%220%22%20y2%3D%221%22%3E%3Cstop%20stop-color%3D%22%238C4FC6%22%2F%3E%3Cstop%20offset%3D%22.48%22%20stop-color%3D%22%235C3386%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%232D1A45%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Cpath%20d%3D%22M%2097.74%2036.93%20L%20105.07%2035.31%20L%20101.30%2010.59%20L%20110.33%209.42%20L%20129.67%209.42%20L%20138.70%2010.59%20L%20134.93%2035.31%20L%20142.26%2036.93%20L%20142.26%2036.93%20L%20149.41%2039.19%20L%20158.51%2015.89%20L%20166.91%2019.40%20L%20183.67%2029.07%20L%20190.90%2034.60%20L%20175.28%2054.12%20L%20180.81%2059.19%20L%20180.81%2059.19%20L%20185.88%2064.72%20L%20205.40%2049.10%20L%20210.93%2056.33%20L%20220.60%2073.09%20L%20224.11%2081.49%20L%20200.81%2090.59%20L%20203.07%2097.74%20L%20203.07%2097.74%20L%20204.69%20105.07%20L%20229.41%20101.30%20L%20230.58%20110.33%20L%20230.58%20129.67%20L%20229.41%20138.70%20L%20204.69%20134.93%20L%20203.07%20142.26%20L%20203.07%20142.26%20L%20200.81%20149.41%20L%20224.11%20158.51%20L%20220.60%20166.91%20L%20210.93%20183.67%20L%20205.40%20190.90%20L%20185.88%20175.28%20L%20180.81%20180.81%20L%20180.81%20180.81%20L%20175.28%20185.88%20L%20190.90%20205.40%20L%20183.67%20210.93%20L%20166.91%20220.60%20L%20158.51%20224.11%20L%20149.41%20200.81%20L%20142.26%20203.07%20L%20142.26%20203.07%20L%20134.93%20204.69%20L%20138.70%20229.41%20L%20129.67%20230.58%20L%20110.33%20230.58%20L%20101.30%20229.41%20L%20105.07%20204.69%20L%2097.74%20203.07%20L%2097.74%20203.07%20L%2090.59%20200.81%20L%2081.49%20224.11%20L%2073.09%20220.60%20L%2056.33%20210.93%20L%2049.10%20205.40%20L%2064.72%20185.88%20L%2059.19%20180.81%20L%2059.19%20180.81%20L%2054.12%20175.28%20L%2034.60%20190.90%20L%2029.07%20183.67%20L%2019.40%20166.91%20L%2015.89%20158.51%20L%2039.19%20149.41%20L%2036.93%20142.26%20L%2036.93%20142.26%20L%2035.31%20134.93%20L%2010.59%20138.70%20L%209.42%20129.67%20L%209.42%20110.33%20L%2010.59%20101.30%20L%2035.31%20105.07%20L%2036.93%2097.74%20L%2036.93%2097.74%20L%2039.19%2090.59%20L%2015.89%2081.49%20L%2019.40%2073.09%20L%2029.07%2056.33%20L%2034.60%2049.10%20L%2054.12%2064.72%20L%2059.19%2059.19%20L%2059.19%2059.19%20L%2064.72%2054.12%20L%2049.10%2034.60%20L%2056.33%2029.07%20L%2073.09%2019.40%20L%2081.49%2015.89%20L%2090.59%2039.19%20L%2097.74%2036.93%20Z%20M%20120%20120%20m%20-46%200%20a%2046%2046%200%201%200%2092%200%20a%2046%2046%200%201%200%20-92%200%20Z%22%20fill%3D%22url(%23metal)%22%20fill-rule%3D%22evenodd%22%20stroke%3D%22%239659CC%22%20stroke-width%3D%221.1%22%2F%3E%3C%2Fsvg%3E") center / contain no-repeat;
+  opacity:.70;
+  pointer-events:none;
+  z-index:0;
+}
+.sidebar > .sidebar-head, .sidebar > .nav, .sidebar > .sidebar-foot { position:relative;z-index:1; }
+.nav-item { color:#BAB3C5; }
+.nav-item:hover { background:rgba(176,108,236,.10); color:#FFFFFF; }
+.nav-item.active {
+  color:#FFFFFF;
+  border-color:rgba(206,155,251,.20);
+  background:linear-gradient(100deg,#AC60EB 0%,#7D2ACA 58%,#5913A4 100%);
+  box-shadow:0 5px 20px rgba(105,36,168,.25),inset 0 1px rgba(255,255,255,.15);
+}
+.nav-item.active .nav-ico { color:#FFFFFF; }
+.nav-item:hover .nav-ico { color:#D7AEFC; }
+.nav-badge { color:#E6D3FA;background:#503465;border-color:#765292; }
+.nav-badge.gold { color:#F5DAFF;background:#71439A;border-color:#9563C1; }
+.sidebar-user { background:rgba(191,136,237,.06);border-color:rgba(200,165,230,.12); }
+.sidebar-action [data-icon] { color:#C895F4; }
+.avatar { color:#21152C;background:linear-gradient(145deg,#DBB0FF,#9F54D9); }
+.user-menu { background:#2A2535; }
+
+/* Superfícies do painel: mantém cartões, títulos, listas e menus originais. */
+.topbar {
+  background:rgba(29,26,38,.92);
+  border-bottom-color:#453A50;
+}
+.global-search, .filter-bar, .global-search kbd {
+  background:#2A2634;
+  border-color:var(--line);
+}
+.global-search:focus-within { background:#342C40; border-color:var(--blue);box-shadow:0 0 0 3px rgba(173,95,234,.13); }
+.global-search input { color:var(--text); }
+.card, .stat-card, .eq-card, .entity-card, .user-row,
+.table-wrap, .quick-action, .modal-card, .drawer { background:var(--surface);border-color:var(--line); }
+.stat-card { background:linear-gradient(145deg,#302B3B,#262330); }
+.stat-card::after { background:radial-gradient(circle,rgba(172,93,235,.15),transparent 70%); }
+.stat-card.gold::after { background:radial-gradient(circle,rgba(172,93,235,.15),transparent 70%); }
+.stat-icon { border-color:#5D4677; }
+.stat-icon.gold { background:#422B54;color:#DDB5FF;border-color:#6A4784; }
+.stat-card .stat-value { color:var(--text); }
+.quick-action { background:linear-gradient(180deg,#332D40,#292532); }
+.quick-action.primary, .btn-primary {
+  color:#FFFFFF;
+  border-color:#8A3DCE;
+  background:linear-gradient(120deg,#B063EB,#8C36D2 58%,#6D1AB6);
+  box-shadow:0 10px 24px -15px rgba(164,66,225,.65),inset 0 1px rgba(255,255,255,.21);
+}
+.btn-primary:hover { background:linear-gradient(120deg,#C07AF5,#9F4CE2 55%,#7725C3); }
+.btn-gold { color:#fff;border-color:#8045B2;background:linear-gradient(120deg,#B275E9,#9050CE); }
+.btn-secondary, .page-btn {
+  color:var(--text-2);background:#302B3D;border-color:var(--line-2);box-shadow:none;
+}
+.btn-secondary:hover, .page-btn:hover:not(:disabled) { background:#40374F;border-color:#79618D; }
+.btn-ghost:hover, .icon-btn:hover, .topbar-user:hover { background:rgba(180,116,230,.11); }
+.page-btn.active { background:#7733B6;border-color:#A05EDE;color:#FFFFFF; }
+.quick-action-icon, .movement-dot, .help-num { border-color:#5C4771; }
+.quick-action.primary .quick-action-icon { background:rgba(255,255,255,.18);color:#fff; }
+.input, .select, .textarea, .field input, .field select, .field textarea,
+.filter-search input {
+  background:#302B3B;
+  border-color:var(--line-2);
+  color:var(--text);
+}
+.input:hover, .select:hover, .textarea:hover, .field input:hover,
+.field select:hover, .field textarea:hover { border-color:#77618B; }
+.input:focus, .select:focus, .textarea:focus, .field input:focus,
+.field select:focus, .field textarea:focus, .filter-search input:focus {
+  background:#393246;border-color:var(--blue);
+  box-shadow:0 0 0 3px rgba(174,103,237,.15);
+}
+input::placeholder, textarea::placeholder { color:#9990A6; }
+.data-table thead th { background:#302B3D; }
+.data-table tbody td { border-bottom-color:#453C50;color:var(--text-2); }
+.data-table tbody tr:hover { background:#342C41; }
+.eq-card-grid, .entity-metrics, .movement-item { border-color:var(--line); }
+.category-bar { background:#40384B; }
+.skeleton { background:linear-gradient(90deg,#312B3D 25%,#403648 37%,#312B3D 63%);background-size:400% 100%; }
+.drawer { background:#272330; }
+.drawer-head { background:linear-gradient(180deg,#352E40,#292430); }
+.drawer-tabs, .drawer-foot, .modal-foot { background:#2A2635; }
+.modal-backdrop, .drawer-backdrop { background:rgba(9,6,16,.70); }
+.user-menu button:hover, .auth-install:hover { background:#44354F; }
+.auth-signup, .filter-bar, .auth-install { border-color:var(--line); }
+.quick-action:hover { border-color:#785890; }
+
+/* Indicadores continuam distinguindo disponível, entregue e manutenção. */
+.status-disponivel, .badge.green, .status-encerrado, .status-concluida { border-color:#3B775B; }
+.status-entregue, .status-aberto, .status-aberta, .status-em_andamento,
+.status-parcial, .status-pendente, .badge.pending { color:#F4C866;background:#413424;border-color:#725C36; }
+.status-manutencao, .badge.red { border-color:#80525C; }
+.status-transferido { border-color:#6D538D; }
+.badge { border-color:#674B80; }
+.badge.gold { color:#D8AEFC;border-color:#6F4B8B; }
+.alert-info { color:#CFADFC;background:#302640;border-color:#624A7B; }
+.alert-warn, .review-badge, .accessory-chip.pending { color:#F4C866;background:#413424;border-color:#725C36; }
+.alert-danger { border-color:#80525C; }
+.alert-success { border-color:#3B775B; }
+.entity-note { background:#392C43;border-color:#655078;color:#E2C8F7; }
+.toast, .toast.info { background:linear-gradient(145deg,#453159,#30233E); }
+.update-banner { background:#38284D;color:#FFFFFF;border-color:#755793; }
+.offline-banner { color:#F4C866;border-color:#725C36; }
